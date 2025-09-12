@@ -9,9 +9,9 @@ export default function HomePage() {
 
   // If the user is not signed in → show landing page with sign-in link
   if (userId) {
-    return ("/dashboard");
+    return "/dashboard";
   }
 
   // If user is signed in → redirect or show dashboard link
-  return <DashboardPage />
+  return <DashboardPage />;
 }
