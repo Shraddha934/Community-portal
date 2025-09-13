@@ -1,17 +1,18 @@
 // app/page.js
 
 import { auth } from "@clerk/nextjs/server";
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import DashboardPage from "./dashboard/page";
+import LandingPage from "../components/LandingPage";
 
 export default function HomePage() {
   const { userId } = auth();
 
-  // If the user is not signed in → show landing page with sign-in link
+  // ✅ If the user is logged in → show Dashboard
   if (userId) {
-    return "/dashboard";
+    return <DashboardPage />;
   }
 
-  // If user is signed in → redirect or show dashboard link
-  return <DashboardPage />;
+  // ✅ If the user is not logged in → show Landing Page
+  return <LandingPage />;
 }

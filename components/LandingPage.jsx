@@ -4,7 +4,7 @@
 import React from "react";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function LandingPage() {
