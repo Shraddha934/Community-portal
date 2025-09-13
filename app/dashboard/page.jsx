@@ -1,5 +1,6 @@
 // app/dashboard/page.jsx
 "use client";
+import { useUser } from "@clerk/nextjs";
 
 import React, { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -14,52 +15,59 @@ const dummyIssues = [
   {
     id: 1,
     title: "Broken Streetlight",
-    image: "/issues/streetlight.jpg",
+    image:
+      "https://imgs.search.brave.com/n1AZ8Lcv4XNzNZ0tpvvMmus1u-L_Fe-tKJYkrmCIkRc/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5pc3RvY2twaG90/by5jb20vaWQvMTQ0/NTE4Mzc1Mi9waG90/by9icm9rZW4tc3Ry/ZWV0LWxhbXAuanBn/P3M9NjEyeDYxMiZ3/PTAmaz0yMCZjPUst/aWRPNGpNUXRldk9s/YTVHV2xWN3VaRXZH/NzllbTBZZFh0VW41/a0VQLTQ9",
     landmark: "Sector 21",
     status: "Pending",
   },
   {
     id: 2,
     title: "Pothole",
-    image: "/issues/pothole.jpg",
+    image:
+      "https://imgs.search.brave.com/vBAwWKDdXUxZSSXwVA1vKWkYmyYo02usxQywjb3L9sg/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90aHVt/YnMuZHJlYW1zdGlt/ZS5jb20vYi9wb3Ro/b2xlcy1yb3VnaC1k/aXJ0LXJvYWQtd2lu/dGVyLWZpbGxlZC13/YXRlci1zbm93LXBp/bGVkLXVwLXNpZGUt/MTc1NzgzNzEzLmpw/Zw",
     landmark: "Main Road",
     status: "In Progress",
   },
   {
     id: 3,
     title: "Fallen Tree",
-    image: "/issues/tree.jpg",
+    image:
+      "https://imgs.search.brave.com/g93aFkZRyySZGOBgJBr_2uCMPvwGdYMXaw8wv5lpHDU/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5pc3RvY2twaG90/by5jb20vaWQvMTQw/MTQzMzg3My9waG90/by9mYWxsZW4tdHJl/ZS1mb3Jlc3QtdHJh/aWwuanBnP3M9NjEy/eDYxMiZ3PTAmaz0y/MCZjPXpFSGVfNVZn/NGtYd0l0NmtZVDcx/U2IxeVh3SVRBVzF2/ZTlEdW02SllROGM9",
     landmark: "Park Entrance",
     status: "Resolved",
   },
   {
     id: 4,
     title: "Broken Benches",
-    image: "/issues/bench.jpg",
+    image:
+      "https://imgs.search.brave.com/kJBuvsVDqW5tA2V2cZUGqETniVQ6rtEewU5SUHLlcAM/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5pc3RvY2twaG90/by5jb20vaWQvNTIy/MDU0NjI3L3Bob3Rv/L2Jyb2tlbi1wYXJr/LWJlbmNoLmpwZz9z/PTYxMng2MTImdz0w/Jms9MjAmYz1TcXdM/TEppOGd0cVo5emJC/Qnl3Zk1ieUhlaXV2/M3Y3RTdudC1fMHdM/bUZvPQ",
     landmark: "Near Shiv Mandir",
     status: "Pending",
-  },{
+  },
+  {
     id: 5,
-    title: "OpenManhole",
-    image: "/issues/tree.jpg",
+    title: "Open Manhole",
+    image:
+      "https://imgs.search.brave.com/cTmsM5eUYvPPVsp42874GLsf-K_hvrN2RXhKZeMmWmo/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzA0LzYyLzQxLzcx/LzM2MF9GXzQ2MjQx/NzEwNl9kS2RTNHF2/VWNHQTROTXlpM2NB/TDR4eWNkOWNmYkM1/Ny5qcGc",
     landmark: "Kamothe",
     status: "Resolved",
-  }
-  ,{
+  },
+  {
     id: 6,
     title: "leakyPipe",
-    image: "/issues/tree.jpg",
+    image:
+      "https://imgs.search.brave.com/SGgdaWAj42dEhOK4J3O19FFDFntaTP0PBTtrzXtryGo/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90My5m/dGNkbi5uZXQvanBn/LzAzLzgwLzUwLzIy/LzM2MF9GXzM4MDUw/MjI0NV9zSnc0bkNt/bzIxQXBOVDg2Z0JV/cGhIaVFDOFgwVVBK/Qy5qcGc",
     landmark: "Park Entrance",
     status: "Resolved",
-  }
-  ,{
+  },
+  {
     id: 7,
     title: "Garbage",
-    image: "/issues/tree.jpg",
+    image:
+      "https://imgs.search.brave.com/23g6ozMnZ70mgk_EPtD7dDyfwT7GtESsTJGUZ5Mj6_8/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5nZXR0eWltYWdl/cy5jb20vaWQvMjE2/MzQ2NjY3Mi9waG90/by9vdmVyZmxvd2lu/Zy1vdXRkb29yLWdh/cmJhZ2UtYmluLmpw/Zz9zPTYxMng2MTIm/dz0wJms9MjAmYz0z/WUlFRHlVMG5Fdkxq/T2RzeFVRNWdrWFFZ/UjdDamN1VThkQktk/WFVqQnY0PQ",
     landmark: "Park Entrance",
     status: "In Progress",
-  }
- 
+  },
 ];
 
 export default function DashboardPage() {
@@ -67,7 +75,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [fabOpen, setFabOpen] = useState(false);
   const router = useRouter();
-
+  const { isSignedIn } = useUser();
   const toggleLike = (id) => {
     setLiked((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -103,7 +111,10 @@ export default function DashboardPage() {
       {/* Issues Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {filteredIssues.map((issue) => (
-          <Card key={issue.id} className="relative shadow-lg hover:shadow-xl transition">
+          <Card
+            key={issue.id}
+            className="relative shadow-lg hover:shadow-xl transition"
+          >
             {/* Issue Image */}
             <div className="relative">
               <img
@@ -151,8 +162,8 @@ export default function DashboardPage() {
 
       {/* Floating Action Button */}
       <div className="fixed bottom-10 right-10 flex flex-col items-end gap-3">
-        {/* Menu buttons (show only if fabOpen is true) */}
-        {fabOpen && (
+        {/* Menu buttons (show only if fabOpen is true AND user is signed in) */}
+        {fabOpen && isSignedIn && (
           <>
             <Button
               className="rounded-full shadow-md"
@@ -169,7 +180,7 @@ export default function DashboardPage() {
           </>
         )}
 
-                {/* Main FAB */}
+        {/* Main FAB */}
         <Button
           size="lg"
           className="rounded-full w-14 h-14 flex items-center justify-center shadow-xl bg-purple-600 hover:bg-violet-700"
@@ -177,8 +188,7 @@ export default function DashboardPage() {
         >
           <Plus size={24} className="text-white" />
         </Button>
-
-    </div>
+      </div>
     </div>
   );
 }
