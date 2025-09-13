@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"; // shadcn ui input
 import { Heart, Search } from "lucide-react";
 import { Plus, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
+import MyIssuesPage from "./my-issue/page";
 
 const dummyIssues = [
   {

@@ -1,87 +1,85 @@
 "use client";
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import axios from "axios";
 
-export default function AddIssuePage() {
-  const [images, setImages] = useState([]);
+export default function Home() {
+  const [image, setImage] = useState(null);
+  const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
+  const [issueType, setIssueType] = useState("");
+  const [priority, setPriority] = useState("");
 
   const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (images.length + files.length > 3) {
-      alert("You can only upload up to 3 images.");
-      return;
-    }
-    setImages((prev) => [...prev, ...files].slice(0, 3));
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onloadend = () => setImage(reader.result); // base64 string
+    reader.readAsDataURL(file);
   };
 
-  const handlePost = () => {
-    if (images.length < 1) {
-      alert("Please capture or upload at least 1 image.");
-      return;
-    }
-    alert("Issue posted successfully 🚀");
-    // Later: API call will go here
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const res = await axios.post("/api/prioritize", {
+      image,
+      location,
+      description,
+      issueType,
+    });
+
+    setPriority(res.data.priority);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center overflow-y-auto">
-      {/* Page Heading */}
-      <h1 className="text-2xl font-bold mb-8 sticky top-0 bg-gray-50 w-full text-center py-2 z-10 mt-16">
-        Add New Issue
-      </h1>
+    <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
+      <h1>Civic Issue Classifier</h1>
+      <form onSubmit={handleSubmit}>
+        <input type="file" onChange={handleImageChange} />
+        <br />
+        <br />
+        <input
+          type="text"
+          placeholder="Location"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+        <br />
+        <br />
+        <input
+          type="text"
+          placeholder="Issue Type"
+          value={issueType}
+          onChange={(e) => setIssueType(e.target.value)}
+        />
+        <br />
+        <br />
+        <textarea
+          placeholder="Description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+        <br />
+        <br />
+        <button type="submit">Classify</button>
+      </form>
 
-      {/* Upload Section */}
-      <div className="w-full max-w-md bg-white shadow-md rounded-lg p-6">
-        <p className="text-gray-700 mb-2">Capture or Upload Images (1–3)</p>
-
-        <div className="flex flex-col gap-3 mb-4">
-          {/* Capture with Camera */}
-          <label className="block">
-            <span className="text-gray-600 text-sm">Capture from Camera</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment" // back camera
-              onChange={handleImageChange}
-              className="mt-1 block w-full text-sm text-gray-500"
-            />
-          </label>
-
-          {/* Upload from Gallery */}
-          <label className="block">
-            <span className="text-gray-600 text-sm">Upload from Gallery</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageChange}
-              className="mt-1 block w-full text-sm text-gray-500"
-            />
-          </label>
-        </div>
-
-        {/* Preview Images */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {images.map((file, index) => (
-            <div key={index} className="relative">
-              <img
-                src={URL.createObjectURL(file)}
-                alt={`upload-${index}`}
-                className="w-full h-24 object-cover rounded-lg border"
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Post Button */}
-        <Button
-          onClick={handlePost}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          Post Issue
-        </Button>
-      </div>
+      {priority && (
+        <h2>
+          Predicted Priority:{" "}
+          <span
+            style={{
+              color:
+                priority === "Critical"
+                  ? "red"
+                  : priority === "Normal"
+                  ? "orange"
+                  : "green",
+            }}
+          >
+            {priority}
+          </span>
+        </h2>
+      )}
     </div>
   );
 }
