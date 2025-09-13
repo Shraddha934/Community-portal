@@ -1,14 +1,38 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { UserButton, SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { Menu, X } from "lucide-react"; // hamburger & close icons
 
 const Navbar = () => {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => {
+    if (isSignedIn && user) {
+      const createUser = async () => {
+        try {
+          const res = await fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              name: user.fullName,
+              email: user.emailAddresses[0].emailAddress,
+            }),
+          });
+
+          const data = await res.json();
+          console.log("User created/fetched:", data);
+        } catch (err) {
+          console.error("Error creating user:", err);
+        }
+      };
+
+      createUser();
+    }
+  }, [isSignedIn, user]);
   return (
     <nav className="bg-white shadow-md fixed w-full top-0 left-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
