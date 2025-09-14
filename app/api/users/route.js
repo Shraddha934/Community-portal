@@ -4,7 +4,10 @@ import connectToDB from "../../../lib/mongoose";
 import User from "../../../models/User";
 
 //const ADMIN_EMIAL="add_your_mail"
-const ADMIN_EMAIL = "shraddhaghuleshraddha@gmail.com"; // set your admin email
+const ADMIN_EMAIL = [
+  "shraddhaghuleshraddha@gmail.com",
+  "paurasmore22@gmail.com",
+]; // set your admin email
 
 export async function POST(req) {
   try {
@@ -18,7 +21,7 @@ export async function POST(req) {
     const { name, email } = await req.json();
 
     // If admin email, set role = admin
-    const role = email === ADMIN_EMAIL ? "admin" : "user";
+    const role = ADMIN_EMAIL.includes(email) ? "admin" : "user";
 
     // Always ensure user exists (create or update)
     const user = await User.findOneAndUpdate(
