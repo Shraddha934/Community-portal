@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState,useEffect, useRef} from "react";
 import axios from "axios";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +35,53 @@ export default function Home() {
   const [loadingPrediction, setLoadingPrediction] = useState(false);
   const [loadingPriority, setLoadingPriority] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // 🎤 Speech recognition states
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = "en-US";
+
+      recognitionRef.current.onresult = (event) => {
+        let interimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcriptChunk = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            setDescription((prev) => prev + transcriptChunk + " ");
+          } else {
+            interimTranscript += transcriptChunk;
+          }
+        }
+      };
+
+      recognitionRef.current.onerror = (err) => {
+        console.error("Speech recognition error:", err);
+        setListening(false);
+      };
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Speech Recognition not supported in this browser (try Chrome).");
+      return;
+    }
+
+    if (listening) {
+      recognitionRef.current.stop();
+      setListening(false);
+    } else {
+      recognitionRef.current.start();
+      setListening(true);
+    }
+  };
 
   // 🔹 Handle image upload + prediction (Flask)
   const handleImageChange = async (e) => {
@@ -281,11 +328,24 @@ export default function Home() {
             {/* Description */}
             <div>
               <label className="text-sm font-medium">Description</label>
-              <Textarea
-                placeholder="Describe the issue"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Describe the issue"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`${
+                    listening
+                      ? "bg-red-500 hover:bg-red-600"
+                      : "bg-green-500 hover:bg-green-600"
+                  } text-white`}
+                >
+                  {listening ? "🎤 Stop" : "🎤 Speak"}
+                </Button>
+              </div>
             </div>
 
             {/* Get Priority + Submit buttons */}

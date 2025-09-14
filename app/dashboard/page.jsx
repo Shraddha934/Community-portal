@@ -90,10 +90,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      {/* Dashboard Title */}
-      <h1 className="text-3xl font-bold mb-6 text-center">Dashboard</h1>
-
+    <div className="min-h-screen bg-gray-50 p-8 mt-14">
       {/* Search Bar */}
       <div className="flex justify-center mb-8">
         <div className="relative w-full max-w-md">

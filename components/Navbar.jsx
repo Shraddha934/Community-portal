@@ -3,21 +3,23 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { UserButton, SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
-import { Menu, X } from "lucide-react"; // hamburger & close icons
+import { Menu, X } from "lucide-react";
 
 const Navbar = () => {
   const { isSignedIn, user } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [role, setRole] = useState(null);
 
   useEffect(() => {
     if (isSignedIn && user) {
-      const createUser = async () => {
+      const createOrFetchUser = async () => {
         try {
           const res = await fetch("/api/users", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
+              clerkId: user.id, // store Clerk ID
               name: user.fullName,
               email: user.emailAddresses[0].emailAddress,
             }),
@@ -25,45 +27,48 @@ const Navbar = () => {
 
           const data = await res.json();
           console.log("User created/fetched:", data);
+
+          if (data?.user?.role) {
+            setRole(data.user.role); // set role in state
+          }
         } catch (err) {
-          console.error("Error creating user:", err);
+          console.error("Error creating/fetching user:", err);
         }
       };
 
-      createUser();
+      createOrFetchUser();
     }
   }, [isSignedIn, user]);
+
   return (
-    <nav className="bg-white shadow-md fixed w-full top-0 left-0 z-50">
+    <nav className="bg-white shadow-md border-b border-gray-200 fixed w-full top-0 left-0 z-50 py-3">
+
+
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         {/* Logo / Brand */}
         <Link href="/" className="text-2xl font-bold text-blue-600">
           Community Issue Reporting Portal
         </Link>
-        <header className="flex items-center justify-between px-6 py-4 ">
-          <nav className="hidden md:flex gap-6 text-gray-700">
-            <Link href="#features" className="hover:text-blue-600">
-              Features
-            </Link>
-            <Link href="#about" className="hover:text-blue-600">
-              About
-            </Link>
-            <Link href="#contact" className="hover:text-blue-600">
-              Contact
-            </Link>
-          </nav>
-        </header>
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-6">
           {isSignedIn ? (
             <>
-              <Link
-                href="/dashboard"
-                className="text-gray-700 hover:text-blue-600"
-              >
-                Dashboard
-              </Link>
+              {role === "admin" ? (
+                <Link
+                  href="/admin"
+                  className="text-gray-700 hover:text-blue-600"
+                >
+                  Admin Dashboard
+                </Link>
+              ) : (
+                <Link
+                  href="/dashboard"
+                  className="text-gray-700 hover:text-blue-600"
+                >
+                  Dashboard
+                </Link>
+              )}
               <UserButton afterSignOutUrl="/" />
             </>
           ) : (
@@ -96,13 +101,23 @@ const Navbar = () => {
         <div className="md:hidden bg-white shadow-md flex flex-col items-center gap-4 py-6">
           {isSignedIn ? (
             <>
-              <Link
-                href="/dashboard"
-                className="text-gray-700 hover:text-blue-600"
-                onClick={() => setMenuOpen(false)}
-              >
-                Dashboard
-              </Link>
+              {role === "admin" ? (
+                <Link
+                  href="/admin/dashboard"
+                  className="text-gray-700 hover:text-blue-600"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Admin Dashboard
+                </Link>
+              ) : (
+                <Link
+                  href="/dashboard"
+                  className="text-gray-700 hover:text-blue-600 "
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+              )}
               <UserButton afterSignOutUrl="/" />
             </>
           ) : (
