@@ -1,70 +1,86 @@
-// app/dashboard/my-issues/page.jsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-// Dummy Data – later replace with API response
-const dummyIssues = [
-  {
-    id: 1,
-    title: "Broken Streetlight",
-    date: "2025-09-01",
-    status: "Pending",
-    image: "https://via.placeholder.com/150",
-    landmark: "Near City Park",
-  },
-  {
-    id: 2,
-    title: "Pothole on Road",
-    date: "2025-09-03",
-    status: "In Progress",
-    image: "https://via.placeholder.com/150",
-    landmark: "MG Road Junction",
-  },
-  {
-    id: 3,
-    title: "Garbage Overflow",
-    date: "2025-09-05",
-    status: "Resolved",
-    image: "https://via.placeholder.com/150",
-    landmark: "Behind Bus Stand",
-  },
-];
+import { useUser } from "@clerk/nextjs";
+import axios from "axios";
 
 export default function MyIssuesPage() {
+  const { user, isLoaded } = useUser(); // wait until Clerk user is loaded
   const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Extract email once user is loaded
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
 
   useEffect(() => {
-    // Replace this with API call to fetch user’s issues
-    setIssues(dummyIssues);
-  }, []);
+    if (!isLoaded || !userEmail) return; // wait until user and email are ready
+
+    const fetchIssues = async () => {
+      try {
+        setLoading(true);
+        // Pass email as query param
+        const res = await axios.get(`/api/my-issues?email=${userEmail}`);
+        setIssues(res.data);
+      } catch (err) {
+        console.error("Error fetching issues:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIssues();
+  }, [isLoaded, userEmail]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-2xl font-bold mb-6 text-center">My Reported Issues</h1>
+      <h1 className="text-2xl font-bold mb-6 text-center">
+        My Reported Issues
+      </h1>
 
-      {issues.length === 0 ? (
+      {loading ? (
+        <p className="text-center text-gray-600">Loading issues...</p>
+      ) : issues.length === 0 ? (
         <p className="text-center text-gray-600">No issues reported yet.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {issues.map((issue) => (
-            <Card key={issue.id} className="shadow-md rounded-xl">
+            <Card key={issue._id} className="shadow-md rounded-xl">
               <div className="relative">
                 <img
                   src={issue.image}
-                  alt={issue.title}
+                  alt={issue.issueType}
                   className="w-full h-40 object-cover rounded-t-xl"
                 />
                 <Badge className="absolute top-2 left-2 bg-white/80 backdrop-blur-md text-gray-800">
-                  {issue.status}
+                  {issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
                 </Badge>
               </div>
               <CardContent className="p-4">
-                <h2 className="font-semibold text-lg">{issue.title}</h2>
-                <p className="text-sm text-gray-600">{issue.landmark}</p>
-                <p className="text-xs text-gray-500 mt-2">📅 {issue.date}</p>
+                <h2 className="font-semibold text-lg">
+                  {issue.issueType.replaceAll("_", " ")}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {issue.location.landmark}
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  📅 {new Date(issue.createdAt).toLocaleDateString()}
+                </p>
+                <p className="mt-1 text-sm font-medium">
+                  Priority:{" "}
+                  <span
+                    className={
+                      issue.priority === "high"
+                        ? "text-red-600"
+                        : issue.priority === "medium"
+                        ? "text-yellow-500"
+                        : "text-green-600"
+                    }
+                  >
+                    {issue.criticality}
+                  </span>
+                </p>
               </CardContent>
             </Card>
           ))}
