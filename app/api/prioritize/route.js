@@ -17,7 +17,7 @@ Details:
 - Description: ${description}
 - Location: ${location}
 - Image: ${image ? "Included" : "No image provided"}
-
+Focus more on image and description for classification.
 Return only the priority: Critical / Normal / Low.
 `;
 
