@@ -42,8 +42,6 @@ const Navbar = () => {
 
   return (
     <nav className="bg-white shadow-md border-b border-gray-200 fixed w-full top-0 left-0 z-50 py-3">
-
-
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         {/* Logo / Brand */}
         <Link href="/" className="text-2xl font-bold text-blue-600">
@@ -54,6 +52,7 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-6">
           {isSignedIn ? (
             <>
+              {/* Dashboard link based on role */}
               {role === "admin" ? (
                 <Link
                   href="/admin"
@@ -69,6 +68,22 @@ const Navbar = () => {
                   Dashboard
                 </Link>
               )}
+
+              {/* Common Map link */}
+              <Link href="/map" className="text-gray-700 hover:text-blue-600">
+                Map
+              </Link>
+
+              {/* Wrong predicted only for admin */}
+              {role === "admin" && (
+                <Link
+                  href="/wrongpredict"
+                  className="text-gray-700 hover:text-blue-600"
+                >
+                  Wrong predicted
+                </Link>
+              )}
+
               <UserButton afterSignOutUrl="/" />
             </>
           ) : (
@@ -103,7 +118,7 @@ const Navbar = () => {
             <>
               {role === "admin" ? (
                 <Link
-                  href="/admin/dashboard"
+                  href="/admin"
                   className="text-gray-700 hover:text-blue-600"
                   onClick={() => setMenuOpen(false)}
                 >
@@ -112,12 +127,33 @@ const Navbar = () => {
               ) : (
                 <Link
                   href="/dashboard"
-                  className="text-gray-700 hover:text-blue-600 "
+                  className="text-gray-700 hover:text-blue-600"
                   onClick={() => setMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
               )}
+
+              {/* Common Map link */}
+              <Link
+                href="/map"
+                className="text-gray-700 hover:text-blue-600"
+                onClick={() => setMenuOpen(false)}
+              >
+                Map
+              </Link>
+
+              {/* Wrong predicted only for admin */}
+              {role === "admin" && (
+                <Link
+                  href="/wrongpredict"
+                  className="text-gray-700 hover:text-blue-600"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Wrong predicted
+                </Link>
+              )}
+
               <UserButton afterSignOutUrl="/" />
             </>
           ) : (
