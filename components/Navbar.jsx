@@ -53,6 +53,7 @@ const Navbar = () => {
           {isSignedIn ? (
             <>
               {/* Dashboard link based on role */}
+              {/* Dashboard link based on role */}
               {role === "admin" ? (
                 <Link
                   href="/admin"
@@ -128,6 +129,7 @@ const Navbar = () => {
                 <Link
                   href="/dashboard"
                   className="text-gray-700 hover:text-blue-600"
+                  // className="text-gray-700 hover:text-blue-600"
                   onClick={() => setMenuOpen(false)}
                 >
                   Dashboard

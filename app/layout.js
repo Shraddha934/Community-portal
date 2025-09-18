@@ -2,6 +2,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import Navbar from "../components/Navbar";
 
+
 export const metadata = {
   title: "Community Portal",
   description: "Manage community issues efficiently",
