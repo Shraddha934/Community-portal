@@ -53,6 +53,7 @@ const Navbar = () => {
           {isSignedIn ? (
             <>
               {/* Dashboard link based on role */}
+              {/* Dashboard link based on role */}
               {role === "admin" ? (
                 <Link
                   href="/admin"
@@ -69,13 +70,20 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Common Map link for both user and admin */}
-              <Link
-                href="/map"
-                className="text-gray-700 hover:text-blue-600"
-              >
+              {/* Common Map link */}
+              <Link href="/map" className="text-gray-700 hover:text-blue-600">
                 Map
               </Link>
+
+              {/* Wrong predicted only for admin */}
+              {role === "admin" && (
+                <Link
+                  href="/wrongpredict"
+                  className="text-gray-700 hover:text-blue-600"
+                >
+                  Wrong predicted
+                </Link>
+              )}
 
               <UserButton afterSignOutUrl="/" />
             </>
@@ -111,7 +119,7 @@ const Navbar = () => {
             <>
               {role === "admin" ? (
                 <Link
-                  href="/admin/dashboard"
+                  href="/admin"
                   className="text-gray-700 hover:text-blue-600"
                   onClick={() => setMenuOpen(false)}
                 >
@@ -121,13 +129,14 @@ const Navbar = () => {
                 <Link
                   href="/dashboard"
                   className="text-gray-700 hover:text-blue-600"
+                  // className="text-gray-700 hover:text-blue-600"
                   onClick={() => setMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
               )}
 
-              {/* Common Map link in mobile menu */}
+              {/* Common Map link */}
               <Link
                 href="/map"
                 className="text-gray-700 hover:text-blue-600"
@@ -135,6 +144,17 @@ const Navbar = () => {
               >
                 Map
               </Link>
+
+              {/* Wrong predicted only for admin */}
+              {role === "admin" && (
+                <Link
+                  href="/wrongpredict"
+                  className="text-gray-700 hover:text-blue-600"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Wrong predicted
+                </Link>
+              )}
 
               <UserButton afterSignOutUrl="/" />
             </>

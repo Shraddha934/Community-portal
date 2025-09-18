@@ -1,6 +1,6 @@
 "use client";
 
-import { useState,useEffect, useRef} from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,20 +26,39 @@ export default function Home() {
   const [image, setImage] = useState(null);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
-  const [address, setAddress] = useState(""); // human-readable
+  const [address, setAddress] = useState("");
   const [landmark, setLandmark] = useState("");
   const [description, setDescription] = useState("");
-  const [issueType, setIssueType] = useState("");
-  const [priority, setPriority] = useState(""); // normalized: "critical"|"normal"|"low"
+  const [issueType, setIssueType] = useState(""); // current dropdown value (snake_case)
+  const [prediction, setPrediction] = useState(""); // normalized model prediction (snake_case)
+  const [priority, setPriority] = useState("");
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [loadingPrediction, setLoadingPrediction] = useState(false);
   const [loadingPriority, setLoadingPriority] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // track whether user changed the dropdown after prediction
+  const [userModifiedIssueType, setUserModifiedIssueType] = useState(false);
+
   // 🎤 Speech recognition states
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
 
+  // ─────────────────────────────────────────────────────────
+  // Helper: normalize any label into the same snake_case used by issueOptions
+  const normalizeToOptionValue = (label) => {
+    if (!label && label !== 0) return "";
+    return String(label)
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_") // spaces -> underscores
+      .replace(/[^a-z0-9_]/g, ""); // remove weird chars
+  };
+
+  // Human friendly display
+  const humanize = (val) => (val ? val.replaceAll("_", " ") : "");
+
+  // ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
       const SpeechRecognition =
@@ -83,17 +102,17 @@ export default function Home() {
     }
   };
 
-  // 🔹 Handle image upload + prediction (Flask)
+  // ─────────────────────────────────────────────────────────
+  // Handle image upload + prediction (Flask)
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Preview as base64
+    // preview
     const reader = new FileReader();
     reader.onloadend = () => setImage(reader.result);
     reader.readAsDataURL(file);
 
-    // Send original file to your Flask /predict
     const formData = new FormData();
     formData.append("file", file);
 
@@ -103,9 +122,18 @@ export default function Home() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      if (res.data.class) {
-        setIssueType(res.data.class);
-      }
+      // raw label from model (might be "Garbage" / "garbage" / "garbage ")
+      const raw = res.data?.class ?? "";
+
+      // normalize to our option value format
+      const normalized = normalizeToOptionValue(raw);
+
+      // if normalized isn't one of our options, keep as-is but normalized will still be stored
+      setIssueType(normalized);
+      setPrediction(normalized);
+      setUserModifiedIssueType(false); // reset user-change flag for new prediction
+
+      console.log("Model predicted:", raw, "-> normalized:", normalized);
     } catch (error) {
       console.error("Prediction error:", error);
       alert("Error classifying the issue. Please try again.");
@@ -114,7 +142,8 @@ export default function Home() {
     }
   };
 
-  // 🔹 Auto-detect location
+  // ─────────────────────────────────────────────────────────
+  // Location detection (unchanged)
   const detectLocation = () => {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser.");
@@ -154,7 +183,8 @@ export default function Home() {
     );
   };
 
-  // 🔹 Get Priority (call /api/prioritize) — user clicks this first
+  // ─────────────────────────────────────────────────────────
+  // Priority detection (unchanged)
   const getPriority = async () => {
     setLoadingPriority(true);
     try {
@@ -165,7 +195,6 @@ export default function Home() {
         issueType,
       });
 
-      // Normalize response and defensively parse unexpected text
       let raw = (res.data.priority || "").toString().trim().toLowerCase();
       if (!["critical", "normal", "low"].includes(raw)) {
         const txt = (res.data.priority || "").toString().toLowerCase();
@@ -174,7 +203,7 @@ export default function Home() {
         else raw = "normal";
       }
 
-      setPriority(raw); // "critical" | "normal" | "low"
+      setPriority(raw);
     } catch (err) {
       console.error("Error getting priority:", err);
       alert("Unable to get priority. Try again.");
@@ -183,7 +212,31 @@ export default function Home() {
     }
   };
 
-  // 🔹 Submit Issue to DB (call /api/issue) — only after priority is set
+  // ─────────────────────────────────────────────────────────
+  // When user changes dropdown, handle and log immediately
+  const handleIssueTypeChange = (e) => {
+    const newVal = e.target.value; // already snake_case option values
+    setIssueType(newVal);
+
+    // mark that user manually changed the selection after prediction
+    setUserModifiedIssueType(true);
+
+    if (prediction) {
+      if (newVal !== prediction) {
+        console.log("User corrected prediction:", {
+          predicted: prediction,
+          final: newVal,
+        });
+      } else {
+        console.log("User explicitly re-selected the predicted value:", newVal);
+      }
+    } else {
+      console.log("User selected issue type (no prediction present):", newVal);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────
+  // Submit (logs as well)
   const handleSubmit = async () => {
     if (!priority) {
       alert("Please detect priority first.");
@@ -192,16 +245,20 @@ export default function Home() {
 
     setSubmitting(true);
     try {
-      // Map normalized priority to DB priority field
-      // critical -> high, normal -> medium, low -> low
       let mappedPriority = "low";
       if (priority === "critical") mappedPriority = "high";
       else if (priority === "normal") mappedPriority = "medium";
       else if (priority === "low") mappedPriority = "low";
 
-      // capitalized criticality for readability (change if backend expects different)
       const criticalityForDb =
-        priority.charAt(0).toUpperCase() + priority.slice(1); // "Critical"|"Normal"|"Low"
+        priority.charAt(0).toUpperCase() + priority.slice(1);
+
+      // Determine accepted vs corrected
+      let issueStatus = "accepted";
+      if (!prediction) issueStatus = "user_provided";
+      else if (prediction && issueType !== prediction)
+        issueStatus = "corrected";
+      else issueStatus = "accepted";
 
       const payload = {
         issueType,
@@ -213,19 +270,35 @@ export default function Home() {
         },
         status: "open",
         usermail: userEmail || "unknown@example.com",
-        priority: mappedPriority, // "high" | "medium" | "low"
+        priority: mappedPriority,
         description,
-        criticality: criticalityForDb, // "Critical" | "Normal" | "Low"
+        criticality: criticalityForDb,
+        issueStatus,
+        predicted: prediction || null,
       };
 
+      console.log("Submitting issue:", payload);
+
+      // Save issue in main collection
       const res = await axios.post("/api/issues", payload);
+
+      // If corrected, also log into Corrected collection
+      if (issueStatus === "corrected") {
+        await axios.post("/api/corrected", {
+          image,
+          predicted: prediction,
+          actual: issueType, // <-- match API field name
+        });
+      }
 
       if (res.data?.success) {
         alert("Issue submitted successfully!");
-        // optional: clear form after success
+        // clear form
         setImage(null);
         setDescription("");
         setIssueType("");
+        setPrediction("");
+        setUserModifiedIssueType(false);
         setLandmark("");
         setAddress("");
         setLatitude("");
@@ -243,6 +316,7 @@ export default function Home() {
     }
   };
 
+  // ─────────────────────────────────────────────────────────
   return (
     <div className="flex justify-center items-center min-h-screen bg-white p-6">
       <Card className="w-full max-w-xl shadow-2xl rounded-2xl bg-gradient-to-r from-blue-50 via-blue-100 to-blue-200">
@@ -306,10 +380,17 @@ export default function Home() {
 
             {/* Issue Type */}
             <div>
-              <label className="text-sm font-medium">Issue Type</label>
+              <label className="text-sm font-medium">
+                Issue Type{" "}
+                {prediction && (
+                  <span className="text-xs text-gray-500">
+                    (Predicted: {humanize(prediction)})
+                  </span>
+                )}
+              </label>
               <select
                 value={issueType}
-                onChange={(e) => setIssueType(e.target.value)}
+                onChange={handleIssueTypeChange}
                 className="w-full border rounded-lg p-2"
               >
                 <option value="">
@@ -323,6 +404,14 @@ export default function Home() {
                   </option>
                 ))}
               </select>
+
+              {/* small helper text if the user changed the selection */}
+              {userModifiedIssueType && (
+                <p className="mt-2 text-sm text-yellow-700">
+                  You changed the predicted issue type — this will be recorded
+                  as a correction.
+                </p>
+              )}
             </div>
 
             {/* Description */}
@@ -363,7 +452,7 @@ export default function Home() {
                 type="button"
                 onClick={handleSubmit}
                 className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!priority || submitting} // 🔹 disabled until priority is set
+                disabled={!priority || submitting}
               >
                 {submitting ? "Submitting..." : "Submit Issue"}
               </Button>
