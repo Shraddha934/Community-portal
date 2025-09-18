@@ -1,97 +1,169 @@
-// app/dashboard/page.jsx
 "use client";
 import { useUser } from "@clerk/nextjs";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // shadcn ui input
-import { Heart, Search } from "lucide-react";
-import { Plus, FileText } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Heart, Search, Plus, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
-import MyIssuesPage from "./my-issue/page";
-
-const dummyIssues = [
-  {
-    id: 1,
-    title: "Broken Streetlight",
-    image:
-      "https://imgs.search.brave.com/n1AZ8Lcv4XNzNZ0tpvvMmus1u-L_Fe-tKJYkrmCIkRc/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5pc3RvY2twaG90/by5jb20vaWQvMTQ0/NTE4Mzc1Mi9waG90/by9icm9rZW4tc3Ry/ZWV0LWxhbXAuanBn/P3M9NjEyeDYxMiZ3/PTAmaz0yMCZjPUst/aWRPNGpNUXRldk9s/YTVHV2xWN3VaRXZH/NzllbTBZZFh0VW41/a0VQLTQ9",
-    landmark: "Sector 21",
-    status: "Pending",
-  },
-  {
-    id: 2,
-    title: "Pothole",
-    image:
-      "https://imgs.search.brave.com/vBAwWKDdXUxZSSXwVA1vKWkYmyYo02usxQywjb3L9sg/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90aHVt/YnMuZHJlYW1zdGlt/ZS5jb20vYi9wb3Ro/b2xlcy1yb3VnaC1k/aXJ0LXJvYWQtd2lu/dGVyLWZpbGxlZC13/YXRlci1zbm93LXBp/bGVkLXVwLXNpZGUt/MTc1NzgzNzEzLmpw/Zw",
-    landmark: "Main Road",
-    status: "In Progress",
-  },
-  {
-    id: 3,
-    title: "Fallen Tree",
-    image:
-      "https://imgs.search.brave.com/g93aFkZRyySZGOBgJBr_2uCMPvwGdYMXaw8wv5lpHDU/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5pc3RvY2twaG90/by5jb20vaWQvMTQw/MTQzMzg3My9waG90/by9mYWxsZW4tdHJl/ZS1mb3Jlc3QtdHJh/aWwuanBnP3M9NjEy/eDYxMiZ3PTAmaz0y/MCZjPXpFSGVfNVZn/NGtYd0l0NmtZVDcx/U2IxeVh3SVRBVzF2/ZTlEdW02SllROGM9",
-    landmark: "Park Entrance",
-    status: "Resolved",
-  },
-  {
-    id: 4,
-    title: "Broken Benches",
-    image:
-      "https://imgs.search.brave.com/kJBuvsVDqW5tA2V2cZUGqETniVQ6rtEewU5SUHLlcAM/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5pc3RvY2twaG90/by5jb20vaWQvNTIy/MDU0NjI3L3Bob3Rv/L2Jyb2tlbi1wYXJr/LWJlbmNoLmpwZz9z/PTYxMng2MTImdz0w/Jms9MjAmYz1TcXdM/TEppOGd0cVo5emJC/Qnl3Zk1ieUhlaXV2/M3Y3RTdudC1fMHdM/bUZvPQ",
-    landmark: "Near Shiv Mandir",
-    status: "Pending",
-  },
-  {
-    id: 5,
-    title: "Open Manhole",
-    image:
-      "https://imgs.search.brave.com/cTmsM5eUYvPPVsp42874GLsf-K_hvrN2RXhKZeMmWmo/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzA0LzYyLzQxLzcx/LzM2MF9GXzQ2MjQx/NzEwNl9kS2RTNHF2/VWNHQTROTXlpM2NB/TDR4eWNkOWNmYkM1/Ny5qcGc",
-    landmark: "Kamothe",
-    status: "Resolved",
-  },
-  {
-    id: 6,
-    title: "leakyPipe",
-    image:
-      "https://imgs.search.brave.com/SGgdaWAj42dEhOK4J3O19FFDFntaTP0PBTtrzXtryGo/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly90My5m/dGNkbi5uZXQvanBn/LzAzLzgwLzUwLzIy/LzM2MF9GXzM4MDUw/MjI0NV9zSnc0bkNt/bzIxQXBOVDg2Z0JV/cGhIaVFDOFgwVVBK/Qy5qcGc",
-    landmark: "Park Entrance",
-    status: "Resolved",
-  },
-  {
-    id: 7,
-    title: "Garbage",
-    image:
-      "https://imgs.search.brave.com/23g6ozMnZ70mgk_EPtD7dDyfwT7GtESsTJGUZ5Mj6_8/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9tZWRp/YS5nZXR0eWltYWdl/cy5jb20vaWQvMjE2/MzQ2NjY3Mi9waG90/by9vdmVyZmxvd2lu/Zy1vdXRkb29yLWdh/cmJhZ2UtYmluLmpw/Zz9zPTYxMng2MTIm/dz0wJms9MjAmYz0z/WUlFRHlVMG5Fdkxq/T2RzeFVRNWdrWFFZ/UjdDamN1VThkQktk/WFVqQnY0PQ",
-    landmark: "Park Entrance",
-    status: "In Progress",
-  },
-];
 
 export default function DashboardPage() {
+  const [issues, setIssues] = useState([]);
   const [liked, setLiked] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [fabOpen, setFabOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // ✅ Filters state
+  const [filters, setFilters] = useState({
+    status: "",
+    issueType: "",
+    priority: "",
+  });
+
   const router = useRouter();
   const { isSignedIn } = useUser();
+
+  // Fetch all issues
+  useEffect(() => {
+    const fetchIssues = async () => {
+      try {
+        const res = await fetch("/api/issues", { cache: "no-store" });
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.issues)) {
+          setIssues(data.issues);
+        } else {
+          setIssues([]);
+        }
+      } catch (err) {
+        console.error("Error fetching issues:", err);
+        setError("Failed to load issues.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchIssues();
+  }, []);
+
+  // ✅ Toggle like
   const toggleLike = (id) => {
     setLiked((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  // Filter issues by search query (title or landmark)
-  const filteredIssues = dummyIssues.filter(
-    (issue) =>
-      issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      issue.landmark.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // ✅ Apply filters client-side
+  const filteredIssues = issues.filter((issue) => {
+    const matchesSearch =
+      issue.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      issue.location?.landmark
+        ?.toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      issue.issueType?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = !filters.status || issue.status === filters.status;
+    const matchesType =
+      !filters.issueType || issue.issueType === filters.issueType;
+    const matchesPriority =
+      !filters.priority || issue.priority === filters.priority;
+
+    return matchesSearch && matchesStatus && matchesType && matchesPriority;
+  });
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleReset = () => {
+    setFilters({ status: "", issueType: "", priority: "" });
+  };
+
+  if (loading) return <p className="text-center">Loading issues...</p>;
+  if (error) return <p className="text-center text-red-500">{error}</p>;
 
   return (
     <div className="min-h-screen bg-gray-50 p-8 mt-14">
-      {/* Search Bar */}
+      {/* 🔹 SubNavBar Filters */}
+      {/* 🔽 Subnavbar Filters */}
+      <div className="bg-white shadow-md rounded-xl p-4 mb-8 flex flex-wrap items-center gap-4 justify-center">
+        {/* Status */}
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-gray-700">Status:</span>
+          {["open", "in_progress", "resolved"].map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilters((prev) => ({ ...prev, status }))}
+              className={`px-3 py-1 rounded-full text-sm transition-all ${
+                filters.status === status
+                  ? "bg-purple-600 text-white shadow-md"
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              }`}
+            >
+              {status.replace("_", " ")}
+            </button>
+          ))}
+        </div>
+
+        {/* Issue Type */}
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-gray-700">Issue:</span>
+          {[
+            "broken_benches",
+            "fallen_trees",
+            "garbage",
+            "leaky_pipes",
+            "open_manhole",
+            "potholes",
+            "streetlight",
+          ].map((type) => (
+            <button
+              key={type}
+              onClick={() =>
+                setFilters((prev) => ({ ...prev, issueType: type }))
+              }
+              className={`px-3 py-1 rounded-full text-sm transition-all ${
+                filters.issueType === type
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              }`}
+            >
+              {type.replace("_", " ")}
+            </button>
+          ))}
+        </div>
+
+        {/* Priority */}
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-gray-700">Priority:</span>
+          {["high", "medium", "low"].map((priority) => (
+            <button
+              key={priority}
+              onClick={() => setFilters((prev) => ({ ...prev, priority }))}
+              className={`px-3 py-1 rounded-full text-sm transition-all ${
+                filters.priority === priority
+                  ? "bg-red-600 text-white shadow-md"
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              }`}
+            >
+              {priority}
+            </button>
+          ))}
+        </div>
+
+        {/* Reset */}
+        <button
+          onClick={() =>
+            setFilters({ status: "", issueType: "", priority: "" })
+          }
+          className="ml-4 px-4 py-1 rounded-full text-sm font-semibold bg-gray-300 hover:bg-gray-400 text-black transition"
+        >
+          Reset
+        </button>
+      </div>
+
+      {/* 🔍 Search Bar */}
       <div className="flex justify-center mb-8">
         <div className="relative w-full max-w-md">
           <Input
@@ -105,17 +177,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Issues Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* 📝 Issues Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-6">
         {filteredIssues.map((issue) => (
           <Card
-            key={issue.id}
+            key={issue._id}
             className="relative shadow-lg hover:shadow-xl transition"
           >
             {/* Issue Image */}
             <div className="relative">
               <img
-                src={issue.image}
+                src={issue.image || "/placeholder.jpg"}
                 alt={issue.title}
                 className="w-full h-56 object-cover rounded-t-lg"
               />
@@ -127,29 +199,53 @@ export default function DashboardPage() {
 
             {/* Card Content */}
             <CardContent className="pt-4">
-              <h2 className="text-lg font-bold">{issue.title}</h2>
+              <h2 className="text-sm font-bold">{issue.title}</h2>
+              <p className="text-lg text-black-600 capitalize font-bold">
+                🏷️{" "}
+                {issue.issueType
+                  ? issue.issueType.replaceAll("_", " ")
+                  : "General"}
+              </p>
+
+              {/* Priority */}
+              <p className="mt-2 text-sm font-semibold">
+                ⚡ Priority:{" "}
+                <span
+                  className={`px-2 py-1 rounded-full text-white ${
+                    issue.priority === "high"
+                      ? "bg-red-600"
+                      : issue.priority === "medium"
+                      ? "bg-yellow-500"
+                      : "bg-green-600"
+                  }`}
+                >
+                  {issue.priority.charAt(0).toUpperCase() +
+                    issue.priority.slice(1)}
+                </span>
+              </p>
             </CardContent>
 
             {/* Card Footer */}
             <CardFooter className="flex justify-between items-center px-4 pb-4">
               <span className="text-sm bg-gray-200 px-2 py-1 rounded-full">
-                {issue.landmark}
+                {issue.location?.landmark || "Unknown"}
               </span>
 
               <Button
                 variant="outline"
                 size="sm"
                 className={`flex items-center gap-1 ${
-                  liked.includes(issue.id) ? "text-red-600" : "text-gray-600"
+                  liked.includes(issue._id) ? "text-red-600" : "text-gray-600"
                 }`}
-                onClick={() => toggleLike(issue.id)}
+                onClick={() => toggleLike(issue._id)}
               >
                 <Heart size={16} />
-                {liked.includes(issue.id) ? "Voted" : "Vote"}
+                {liked.includes(issue._id) ? "Voted" : "Vote"}
               </Button>
             </CardFooter>
           </Card>
         ))}
+
         {filteredIssues.length === 0 && (
           <p className="text-center col-span-full text-gray-500">
             No issues found.
@@ -157,19 +253,18 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Floating Action Button */}
+      {/* ➕ Floating Action Button */}
       <div className="fixed bottom-10 right-10 flex flex-col items-end gap-3">
-        {/* Menu buttons (show only if fabOpen is true AND user is signed in) */}
         {fabOpen && isSignedIn && (
           <>
             <Button
-              className="rounded-full shadow-md"
+              className="rounded-full bg-gray-300 text-black"
               onClick={() => router.push("/dashboard/add-issue")}
             >
               <Plus className="mr-2 h-4 w-4" /> Add New Issue
             </Button>
             <Button
-              className="rounded-full shadow-md"
+              className="rounded-full bg-gray-300 text-black"
               onClick={() => router.push("/dashboard/my-issue")}
             >
               <FileText className="mr-2 h-4 w-4" /> My Issues
@@ -177,7 +272,6 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* Main FAB */}
         <Button
           size="lg"
           className="rounded-full w-14 h-14 flex items-center justify-center shadow-xl bg-purple-600 hover:bg-violet-700"

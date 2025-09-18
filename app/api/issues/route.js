@@ -43,11 +43,20 @@ export async function POST(req) {
   }
 }
 
-// GET - fetch all issues
-export async function GET() {
+export async function GET(req) {
   try {
     await connectToDB();
-    const issues = await Issue.find().sort({ createdAt: -1 });
+
+    const { searchParams } = new URL(req.url);
+    const filters = {};
+    if (searchParams.get("status")) filters.status = searchParams.get("status");
+    if (searchParams.get("criticality"))
+      filters.criticality = searchParams.get("criticality");
+    if (searchParams.get("issueType"))
+      filters.issueType = searchParams.get("issueType");
+
+    const issues = await Issue.find(filters).sort({ createdAt: -1 }).lean();
+
     return NextResponse.json({ success: true, issues });
   } catch (error) {
     return NextResponse.json(
