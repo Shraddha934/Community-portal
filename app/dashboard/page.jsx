@@ -91,7 +91,7 @@ export default function DashboardPage() {
         {/* Status */}
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-700">Status:</span>
-          {["open", "in_progress", "resolved"].map((status) => (
+          {["open", "inprogress", "resolved"].map((status) => (
             <button
               key={status}
               onClick={() => setFilters((prev) => ({ ...prev, status }))}

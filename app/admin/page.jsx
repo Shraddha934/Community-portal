@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import IssueStatus from "../../components/IssueStatus";
 import IssueMap from "../../components/IssueMap";
 
 export default function AdminDashboard() {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("all");
 
   useEffect(() => {
     async function fetchIssues() {
@@ -30,17 +33,79 @@ export default function AdminDashboard() {
     return <p className="text-center mt-10">Loading issues...</p>;
   }
 
-  return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6">📋 All Reported Issues</h1>
+  // 📊 Count stats
+  const total = issues.length;
+  const openCount = issues.filter((i) => i.status === "open").length;
+  const inProgressCount = issues.filter(
+    (i) => i.status === "inprogress"
+  ).length;
+  const resolvedCount = issues.filter((i) => i.status === "resolved").length;
 
+  // 🔍 Apply filter
+  const filteredIssues =
+    filterStatus === "all"
+      ? issues
+      : issues.filter((i) => i.status === filterStatus);
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <h1 className="text-3xl font-bold mb-8 text-gray-800">
+        📊 Admin Dashboard
+      </h1>
+
+      {/* 📊 Analytics Bar */}
+      <div className="flex flex-wrap gap-4 mb-10">
+        <Button
+          variant={filterStatus === "all" ? "default" : "outline"}
+          className="flex items-center gap-2 shadow-sm"
+          onClick={() => setFilterStatus("all")}
+        >
+          Total
+          <Badge variant="secondary" className="bg-gray-200 text-gray-800">
+            {total}
+          </Badge>
+        </Button>
+
+        <Button
+          variant={filterStatus === "open" ? "default" : "outline"}
+          className="flex items-center gap-2 shadow-sm bg-black text-white"
+          onClick={() => setFilterStatus("open")}
+        >
+          Open
+          <Badge className="bg-red-500 text-white">{openCount}</Badge>
+        </Button>
+
+        <Button
+          variant={filterStatus === "inprogress" ? "default" : "outline"}
+          className="flex items-center gap-2 shadow-sm bg-black text-white"
+          onClick={() => setFilterStatus("inprogress")}
+        >
+          In Progress
+          <Badge className="bg-yellow-500 text-white">{inProgressCount}</Badge>
+        </Button>
+
+        <Button
+          variant={filterStatus === "resolved" ? "default" : "outline"}
+          className="flex items-center gap-2 shadow-sm bg-black text-white"
+          onClick={() => setFilterStatus("resolved")}
+        >
+          Resolved
+          <Badge className="bg-green-500 text-white">{resolvedCount}</Badge>
+        </Button>
+      </div>
+
+      {/* 🗂 Issues Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {issues.map((issue) => (
-          <Card key={issue._id} className="shadow-md rounded-lg">
+        {filteredIssues.map((issue) => (
+          <Card
+            key={issue._id}
+            className="shadow-md rounded-xl hover:shadow-lg transition duration-200 bg-white"
+          >
             <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span className="capitalize">{issue.issueType.replaceAll("_", " ")}</span>
-                {/* 🔥 Status dropdown instead of static badge */}
+              <CardTitle className="flex justify-between items-center text-lg">
+                <span className="capitalize">
+                  {issue.issueType.replaceAll("_", " ")}
+                </span>
                 <IssueStatus issue={issue} />
               </CardTitle>
             </CardHeader>
@@ -53,7 +118,6 @@ export default function AdminDashboard() {
                   className="w-full h-40 object-cover rounded-md mb-3"
                 />
               )}
-
               <p className="text-sm text-gray-700 mb-2">
                 <b>Description:</b> {issue.description || "No description"}
               </p>
@@ -85,9 +149,11 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-          {/* 🔥 Map showing issues */}
-    <h2 className="text-xl font-bold mb-4">🌍 Issues on Map</h2>
-    <IssueMap issues={issues} />
+      {/* 🌍 Map Section */}
+      <h2 className="text-xl font-bold mt-12 mb-4 text-gray-800">
+        🌍 Issues on Map
+      </h2>
+      <IssueMap issues={filteredIssues} />
     </div>
   );
 }
