@@ -2,55 +2,34 @@ import mongoose from "mongoose";
 
 const IssueSchema = new mongoose.Schema(
   {
-    issueType: {
-      type: String,
-      required: true,
-      enum: [
-        "broken_benches",
-        "fallen_trees",
-        "garbage",
-        "leaky_pipes",
-        "open_manhole",
-        "potholes",
-        "streetlight",
-        "others",
-      ],
-    },
-    image: {
-      type: String, // store base64 string
-      required: true,
-    },
+    issueType: { type: String, required: true },
+    image: String,
     location: {
-      latitude: { type: Number, required: true },
-      longitude: { type: Number, required: true },
-      landmark: { type: String },
+      type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+      },
+      coordinates: {
+        type: [Number],
+        required: true,
+      },
+      latitude: Number,
+      longitude: Number,
+      landmark: String,
+      fullAddress: String,
     },
-    status: {
-      type: String,
-      enum: ["open", "inprogress", "resolved"],
-      default: "open",
-    },
-    usermail: {
-      type: String,
-      required: true,
-    },
-    priority: {
-      type: String,
-      enum: ["low", "medium", "high"],
-      default: "low",
-    },
-    description: {
-      type: String,
-    },
-    criticality: {
-      type: String,
-      enum: ["Normal", "Critical"],
-      default: "Normal",
-    },
+    status: String,
+    usermail: String,
+    priority: String,
+    description: String,
+    criticality: String,
+    title: String,
   },
   { timestamps: true }
 );
 
-const Issue = mongoose.models.Issue || mongoose.model("Issue", IssueSchema);
+// 🔹 Add 2dsphere index for geospatial queries
+IssueSchema.index({ "location.coordinates": "2dsphere" });
 
-export default Issue;
+export default mongoose.models.Issue || mongoose.model("Issue", IssueSchema);
