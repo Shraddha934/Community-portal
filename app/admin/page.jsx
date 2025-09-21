@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import IssueStatus from "../../components/IssueStatus";
 import IssueMap from "../../components/IssueMap";
+import Sidebar from "../../components/SideBar"; // ⬅️ new sidebar
 
 export default function AdminDashboard() {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [sidebarOpen, setSidebarOpen] = useState(false); // ⬅️ sidebar state
 
   useEffect(() => {
     async function fetchIssues() {
@@ -48,50 +50,77 @@ export default function AdminDashboard() {
       : issues.filter((i) => i.status === filterStatus);
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-gray-50 min-h-screen relative">
       <h1 className="text-3xl font-bold mb-8 text-gray-800">
         📊 Admin Dashboard
       </h1>
 
-      {/* 📊 Analytics Bar */}
-      <div className="flex flex-wrap gap-4 mb-10">
-        <Button
-          variant={filterStatus === "all" ? "default" : "outline"}
-          className="flex items-center gap-2 shadow-sm"
-          onClick={() => setFilterStatus("all")}
-        >
-          Total
-          <Badge variant="secondary" className="bg-gray-200 text-gray-800">
-            {total}
-          </Badge>
-        </Button>
+      {/* 📊 Analytics Bar + Sidebar Button */}
+      <div className="flex justify-between items-center mb-10">
+        {/* Status Buttons */}
+        <div className="flex flex-wrap gap-4">
+          <Button
+            variant={filterStatus === "all" ? "default" : "outline"}
+            className="flex items-center gap-2 shadow-sm"
+            onClick={() => setFilterStatus("all")}
+          >
+            Total
+            <Badge variant="secondary" className="bg-gray-200 text-gray-800">
+              {total}
+            </Badge>
+          </Button>
 
-        <Button
-          variant={filterStatus === "open" ? "default" : "outline"}
-          className="flex items-center gap-2 shadow-sm bg-black text-white"
-          onClick={() => setFilterStatus("open")}
-        >
-          Open
-          <Badge className="bg-red-500 text-white">{openCount}</Badge>
-        </Button>
+          <Button
+            variant={filterStatus === "open" ? "default" : "outline"}
+            className="flex items-center gap-2 shadow-sm bg-black text-white"
+            onClick={() => setFilterStatus("open")}
+          >
+            Open
+            <Badge className="bg-red-500 text-white">{openCount}</Badge>
+          </Button>
 
-        <Button
-          variant={filterStatus === "inprogress" ? "default" : "outline"}
-          className="flex items-center gap-2 shadow-sm bg-black text-white"
-          onClick={() => setFilterStatus("inprogress")}
-        >
-          In Progress
-          <Badge className="bg-yellow-500 text-white">{inProgressCount}</Badge>
-        </Button>
+          <Button
+            variant={filterStatus === "inprogress" ? "default" : "outline"}
+            className="flex items-center gap-2 shadow-sm bg-black text-white"
+            onClick={() => setFilterStatus("inprogress")}
+          >
+            In Progress
+            <Badge className="bg-yellow-500 text-white">
+              {inProgressCount}
+            </Badge>
+          </Button>
 
-        <Button
-          variant={filterStatus === "resolved" ? "default" : "outline"}
-          className="flex items-center gap-2 shadow-sm bg-black text-white"
-          onClick={() => setFilterStatus("resolved")}
+          <Button
+            variant={filterStatus === "resolved" ? "default" : "outline"}
+            className="flex items-center gap-2 shadow-sm bg-black text-white"
+            onClick={() => setFilterStatus("resolved")}
+          >
+            Resolved
+            <Badge className="bg-green-500 text-white">{resolvedCount}</Badge>
+          </Button>
+        </div>
+
+        {/* Sidebar Toggle (3 lines / dots) */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 rounded-md hover:bg-gray-200 transition"
         >
-          Resolved
-          <Badge className="bg-green-500 text-white">{resolvedCount}</Badge>
-        </Button>
+          {/* Hamburger Icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6 text-gray-700"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+        </button>
       </div>
 
       {/* 🗂 Issues Grid */}
@@ -154,6 +183,9 @@ export default function AdminDashboard() {
         🌍 Issues on Map
       </h2>
       <IssueMap issues={filteredIssues} />
+
+      {/* Sidebar Component */}
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} issues={issues} />
     </div>
   );
 }
