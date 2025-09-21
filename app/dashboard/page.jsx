@@ -15,21 +15,52 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ✅ Filters state
+  // Filters state
   const [filters, setFilters] = useState({
     status: "",
     issueType: "",
     priority: "",
+    radius: "", // in km
   });
+
+  // User location
+  const [userLat, setUserLat] = useState(null);
+  const [userLng, setUserLng] = useState(null);
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLat(pos.coords.latitude);
+          setUserLng(pos.coords.longitude);
+        },
+        (err) => {
+          console.error("Error fetching location:", err);
+        }
+      );
+    }
+  }, []);
 
   const router = useRouter();
   const { isSignedIn } = useUser();
 
-  // Fetch all issues
+  // Fetch issues from backend with filters
   useEffect(() => {
     const fetchIssues = async () => {
       try {
-        const res = await fetch("/api/issues", { cache: "no-store" });
+        const params = new URLSearchParams();
+        if (filters.status) params.append("status", filters.status);
+        if (filters.issueType) params.append("issueType", filters.issueType);
+        if (filters.priority) params.append("priority", filters.priority);
+        if (filters.radius && userLat && userLng) {
+          params.append("near", "true");
+          params.append("lat", userLat);
+          params.append("lon", userLng);
+          params.append("radius", filters.radius); // in km
+        }
+
+        const res = await fetch(`/api/issues?${params.toString()}`, {
+          cache: "no-store",
+        });
         const data = await res.json();
 
         if (data.success && Array.isArray(data.issues)) {
@@ -44,118 +75,110 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
-    fetchIssues();
-  }, []);
 
-  // ✅ Toggle like
+    fetchIssues();
+  }, [filters, userLat, userLng]);
+
+  // Toggle like
   const toggleLike = (id) => {
     setLiked((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  // ✅ Apply filters client-side
-  const filteredIssues = issues.filter((issue) => {
-    const matchesSearch =
-      issue.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      issue.location?.landmark
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      issue.issueType?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus = !filters.status || issue.status === filters.status;
-    const matchesType =
-      !filters.issueType || issue.issueType === filters.issueType;
-    const matchesPriority =
-      !filters.priority || issue.priority === filters.priority;
-
-    return matchesSearch && matchesStatus && matchesType && matchesPriority;
-  });
-
+  // Handle filter change
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleReset = () => {
-    setFilters({ status: "", issueType: "", priority: "" });
   };
 
   if (loading) return <p className="text-center">Loading issues...</p>;
   if (error) return <p className="text-center text-red-500">{error}</p>;
 
+  // Client-side search filtering
+  const searchedIssues = issues.filter((issue) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      issue.title?.toLowerCase().includes(query) ||
+      issue.issueType?.toLowerCase().includes(query) ||
+      issue.location?.landmark?.toLowerCase().includes(query) ||
+      issue.location?.fullAddress?.toLowerCase().includes(query)
+    );
+  });
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8 mt-14">
-      {/* 🔹 SubNavBar Filters */}
-      {/* 🔽 Subnavbar Filters */}
+    <div className="min-h-screen bg-gray-50 p-8 mt-10">
+      {/* 🔹 Filters Bar */}
       <div className="bg-white shadow-md rounded-xl p-4 mb-8 flex flex-wrap items-center gap-4 justify-center">
         {/* Status */}
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-700">Status:</span>
-          {["open", "inprogress", "resolved"].map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilters((prev) => ({ ...prev, status }))}
-              className={`px-3 py-1 rounded-full text-sm transition-all ${
-                filters.status === status
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-              }`}
-            >
-              {status.replace("_", " ")}
-            </button>
-          ))}
+          <select
+            value={filters.status}
+            onChange={(e) => handleFilterChange("status", e.target.value)}
+            className="border rounded px-2 py-1"
+          >
+            <option value="">All</option>
+            <option value="open">Open</option>
+            <option value="inprogress">In Progress</option>
+            <option value="resolved">Resolved</option>
+          </select>
         </div>
 
         {/* Issue Type */}
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-700">Issue:</span>
-          {[
-            "broken_benches",
-            "fallen_trees",
-            "garbage",
-            "leaky_pipes",
-            "open_manhole",
-            "potholes",
-            "streetlight",
-          ].map((type) => (
-            <button
-              key={type}
-              onClick={() =>
-                setFilters((prev) => ({ ...prev, issueType: type }))
-              }
-              className={`px-3 py-1 rounded-full text-sm transition-all ${
-                filters.issueType === type
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-              }`}
-            >
-              {type.replace("_", " ")}
-            </button>
-          ))}
+          <select
+            value={filters.issueType}
+            onChange={(e) => handleFilterChange("issueType", e.target.value)}
+            className="border rounded px-2 py-1"
+          >
+            <option value="">All</option>
+            <option value="broken_benches">Broken Benches</option>
+            <option value="fallen_trees">Fallen Trees</option>
+            <option value="garbage">Garbage</option>
+            <option value="leaky_pipes">Leaky Pipes</option>
+            <option value="open_manhole">Open Manhole</option>
+            <option value="potholes">Potholes</option>
+            <option value="streetlight">Streetlight</option>
+          </select>
         </div>
 
         {/* Priority */}
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-700">Priority:</span>
-          {["high", "medium", "low"].map((priority) => (
-            <button
-              key={priority}
-              onClick={() => setFilters((prev) => ({ ...prev, priority }))}
-              className={`px-3 py-1 rounded-full text-sm transition-all ${
-                filters.priority === priority
-                  ? "bg-red-600 text-white shadow-md"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-              }`}
-            >
-              {priority}
-            </button>
-          ))}
+          <select
+            value={filters.priority}
+            onChange={(e) => handleFilterChange("priority", e.target.value)}
+            className="border rounded px-2 py-1"
+          >
+            <option value="">All</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+
+        {/* Radius */}
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-gray-700">Radius:</span>
+          <select
+            value={filters.radius}
+            onChange={(e) => handleFilterChange("radius", e.target.value)}
+            className="border rounded px-2 py-1"
+          >
+            <option value="">All</option>
+            <option value="1">1 km</option>
+            <option value="3">3 km</option>
+            <option value="5">5 km</option>
+            <option value="10">10 km</option>
+            <option value="20">20 km</option>
+          </select>
         </div>
 
         {/* Reset */}
         <button
           onClick={() =>
-            setFilters({ status: "", issueType: "", priority: "" })
+            setFilters({ status: "", issueType: "", priority: "", radius: "" })
           }
           className="ml-4 px-4 py-1 rounded-full text-sm font-semibold bg-gray-300 hover:bg-gray-400 text-black transition"
         >
@@ -168,7 +191,7 @@ export default function DashboardPage() {
         <div className="relative w-full max-w-md">
           <Input
             type="text"
-            placeholder="Search by issue or landmark..."
+            placeholder="Search by issue, landmark, or address..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pr-12"
@@ -179,35 +202,31 @@ export default function DashboardPage() {
 
       {/* 📝 Issues Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-6">
-        {filteredIssues.map((issue) => (
+        {searchedIssues.map((issue) => (
           <Card
             key={issue._id}
-            className="relative shadow-lg hover:shadow-xl transition"
+            className="relative shadow-lg hover:shadow-xl transition cursor-pointer"
+            onClick={() => router.push(`/dashboard/view-issue?id=${issue._id}`)}
           >
-            {/* Issue Image */}
             <div className="relative">
               <img
                 src={issue.image || "/placeholder.jpg"}
-                alt={issue.title}
+                alt={issue.title || "Issue"}
                 className="w-full h-56 object-cover rounded-t-lg"
               />
-              {/* Status Badge */}
               <div className="absolute top-3 left-3 bg-white/50 backdrop-blur-sm text-sm px-3 py-1 rounded-full font-semibold text-gray-800">
                 {issue.status}
               </div>
             </div>
 
-            {/* Card Content */}
             <CardContent className="pt-4">
-              <h2 className="text-sm font-bold">{issue.title}</h2>
+              <h2 className="text-sm font-bold">{issue.title || "Untitled"}</h2>
               <p className="text-lg text-black-600 capitalize font-bold">
                 🏷️{" "}
                 {issue.issueType
                   ? issue.issueType.replaceAll("_", " ")
                   : "General"}
               </p>
-
-              {/* Priority */}
               <p className="mt-2 text-sm font-semibold">
                 ⚡ Priority:{" "}
                 <span
@@ -219,13 +238,30 @@ export default function DashboardPage() {
                       : "bg-green-600"
                   }`}
                 >
-                  {issue.priority.charAt(0).toUpperCase() +
-                    issue.priority.slice(1)}
+                  {issue.priority
+                    ? issue.priority.charAt(0).toUpperCase() +
+                      issue.priority.slice(1)
+                    : "Medium"}
                 </span>
               </p>
+
+              {/* 🔹 Show full address */}
+              <div className="mt-2 text-sm text-gray-700 space-y-1">
+                {issue.location?.landmark && (
+                  <p className="flex items-center gap-2">
+                    <span className="text-indigo-600">🏠</span>
+                    <span>{issue.location.landmark}</span>
+                  </p>
+                )}
+                {issue.location?.fullAddress && (
+                  <p className="flex items-center gap-2">
+                    <span className="text-green-600">📍</span>
+                    <span>{issue.location.fullAddress}</span>
+                  </p>
+                )}
+              </div>
             </CardContent>
 
-            {/* Card Footer */}
             <CardFooter className="flex justify-between items-center px-4 pb-4">
               <span className="text-sm bg-gray-200 px-2 py-1 rounded-full">
                 {issue.location?.landmark || "Unknown"}
@@ -246,7 +282,7 @@ export default function DashboardPage() {
           </Card>
         ))}
 
-        {filteredIssues.length === 0 && (
+        {searchedIssues.length === 0 && (
           <p className="text-center col-span-full text-gray-500">
             No issues found.
           </p>

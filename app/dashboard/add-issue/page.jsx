@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUser } from "@clerk/nextjs";
 
-export default function Home() {
+export default function AddIssuePage() {
   const issueOptions = [
     "broken_benches",
     "fallen_trees",
@@ -19,46 +19,43 @@ export default function Home() {
     "streetlight",
     "others",
   ];
+
   const { user } = useUser();
   const userEmail = user?.primaryEmailAddress?.emailAddress;
 
-  // 🔹 States
+  // States
   const [image, setImage] = useState(null);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [address, setAddress] = useState("");
   const [landmark, setLandmark] = useState("");
   const [description, setDescription] = useState("");
-  const [issueType, setIssueType] = useState(""); // current dropdown value (snake_case)
-  const [prediction, setPrediction] = useState(""); // normalized model prediction (snake_case)
+  const [issueType, setIssueType] = useState("");
+  const [prediction, setPrediction] = useState("");
   const [priority, setPriority] = useState("");
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [loadingPrediction, setLoadingPrediction] = useState(false);
   const [loadingPriority, setLoadingPriority] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  // track whether user changed the dropdown after prediction
   const [userModifiedIssueType, setUserModifiedIssueType] = useState(false);
+  const [topIssues, setTopIssues] = useState([]);
 
-  // 🎤 Speech recognition states
+  // Speech recognition
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
 
-  // ─────────────────────────────────────────────────────────
-  // Helper: normalize any label into the same snake_case used by issueOptions
   const normalizeToOptionValue = (label) => {
     if (!label && label !== 0) return "";
     return String(label)
       .trim()
       .toLowerCase()
-      .replace(/\s+/g, "_") // spaces -> underscores
-      .replace(/[^a-z0-9_]/g, ""); // remove weird chars
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
   };
 
-  // Human friendly display
   const humanize = (val) => (val ? val.replaceAll("_", " ") : "");
 
-  // ─────────────────────────────────────────────────────────
+  // Speech recognition setup
   useEffect(() => {
     if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
       const SpeechRecognition =
@@ -89,10 +86,9 @@ export default function Home() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert("Speech Recognition not supported in this browser (try Chrome).");
+      alert("Speech Recognition not supported in this browser.");
       return;
     }
-
     if (listening) {
       recognitionRef.current.stop();
       setListening(false);
@@ -102,13 +98,11 @@ export default function Home() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────
-  // Handle image upload + prediction (Flask)
+  // Image upload & prediction
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // preview
     const reader = new FileReader();
     reader.onloadend = () => setImage(reader.result);
     reader.readAsDataURL(file);
@@ -122,18 +116,11 @@ export default function Home() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      // raw label from model (might be "Garbage" / "garbage" / "garbage ")
       const raw = res.data?.class ?? "";
-
-      // normalize to our option value format
       const normalized = normalizeToOptionValue(raw);
-
-      // if normalized isn't one of our options, keep as-is but normalized will still be stored
       setIssueType(normalized);
       setPrediction(normalized);
-      setUserModifiedIssueType(false); // reset user-change flag for new prediction
-
-      console.log("Model predicted:", raw, "-> normalized:", normalized);
+      setUserModifiedIssueType(false);
     } catch (error) {
       console.error("Prediction error:", error);
       alert("Error classifying the issue. Please try again.");
@@ -142,16 +129,14 @@ export default function Home() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────
-  // Location detection (unchanged)
+  // Detect location
   const detectLocation = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
+      alert("Geolocation not supported.");
       return;
     }
 
     setLoadingLocation(true);
-
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = position.coords.latitude;
@@ -162,29 +147,27 @@ export default function Home() {
         try {
           const res = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
           const data = await res.json();
-
           if (data?.results && data.results.length > 0) {
             setAddress(data.results[0].formatted_address);
           } else {
             setAddress(`${lat}, ${lon}`);
           }
-        } catch (error) {
-          console.error("Reverse geocoding error:", error);
+        } catch (err) {
+          console.error("Reverse geocoding error:", err);
           setAddress(`${lat}, ${lon}`);
         } finally {
           setLoadingLocation(false);
         }
       },
-      (error) => {
-        console.error(error);
+      (err) => {
+        console.error(err);
         alert("Unable to retrieve location.");
         setLoadingLocation(false);
       }
     );
   };
 
-  // ─────────────────────────────────────────────────────────
-  // Priority detection (unchanged)
+  // Priority detection
   const getPriority = async () => {
     setLoadingPriority(true);
     try {
@@ -197,46 +180,42 @@ export default function Home() {
 
       let raw = (res.data.priority || "").toString().trim().toLowerCase();
       if (!["critical", "normal", "low"].includes(raw)) {
-        const txt = (res.data.priority || "").toString().toLowerCase();
-        if (txt.includes("critical")) raw = "critical";
-        else if (txt.includes("low")) raw = "low";
+        if (raw.includes("critical")) raw = "critical";
+        else if (raw.includes("low")) raw = "low";
         else raw = "normal";
       }
-
       setPriority(raw);
+
+      // Fetch similar nearby issues
+      if (issueType) {
+        const duplicateRes = await axios.get("/api/issues", {
+          params: {
+            issueType,
+            lat: latitude,
+            lon: longitude,
+            near: true,
+          },
+        });
+
+        const nearbyIssues = duplicateRes.data.issues || [];
+        console.log("Nearby similar issues detected:", nearbyIssues);
+        setTopIssues(nearbyIssues.slice(0, 3));
+      }
     } catch (err) {
-      console.error("Error getting priority:", err);
-      alert("Unable to get priority. Try again.");
+      console.error("Unable to get priority or fetch nearby issues.", err);
+      alert("Unable to get priority or fetch nearby issues.");
     } finally {
       setLoadingPriority(false);
     }
   };
-
-  // ─────────────────────────────────────────────────────────
-  // When user changes dropdown, handle and log immediately
+  // Handle dropdown change
   const handleIssueTypeChange = (e) => {
-    const newVal = e.target.value; // already snake_case option values
+    const newVal = e.target.value;
     setIssueType(newVal);
-
-    // mark that user manually changed the selection after prediction
     setUserModifiedIssueType(true);
-
-    if (prediction) {
-      if (newVal !== prediction) {
-        console.log("User corrected prediction:", {
-          predicted: prediction,
-          final: newVal,
-        });
-      } else {
-        console.log("User explicitly re-selected the predicted value:", newVal);
-      }
-    } else {
-      console.log("User selected issue type (no prediction present):", newVal);
-    }
   };
 
-  // ─────────────────────────────────────────────────────────
-  // Submit (logs as well)
+  // Submit
   const handleSubmit = async () => {
     if (!priority) {
       alert("Please detect priority first.");
@@ -245,28 +224,33 @@ export default function Home() {
 
     setSubmitting(true);
     try {
-      let mappedPriority = "low";
-      if (priority === "critical") mappedPriority = "high";
-      else if (priority === "normal") mappedPriority = "medium";
-      else if (priority === "low") mappedPriority = "low";
-
+      let mappedPriority =
+        priority === "critical"
+          ? "high"
+          : priority === "normal"
+          ? "medium"
+          : "low";
       const criticalityForDb =
         priority.charAt(0).toUpperCase() + priority.slice(1);
 
-      // Determine accepted vs corrected
-      let issueStatus = "accepted";
-      if (!prediction) issueStatus = "user_provided";
-      else if (prediction && issueType !== prediction)
-        issueStatus = "corrected";
-      else issueStatus = "accepted";
+      const issueStatus =
+        prediction && prediction !== issueType
+          ? "corrected"
+          : prediction
+          ? "accepted"
+          : "user_provided";
+
+      // Fallback for fullAddress
+      const finalAddress = address || `${latitude}, ${longitude}`;
 
       const payload = {
         issueType,
         image,
         location: {
-          latitude,
-          longitude,
+          latitude: Number(latitude),
+          longitude: Number(longitude),
           landmark,
+          fullAddress: finalAddress,
         },
         status: "open",
         usermail: userEmail || "unknown@example.com",
@@ -277,23 +261,20 @@ export default function Home() {
         predicted: prediction || null,
       };
 
-      console.log("Submitting issue:", payload);
+      console.log("Submitting issue payload:", payload); // <-- log payload
 
-      // Save issue in main collection
       const res = await axios.post("/api/issues", payload);
 
-      // If corrected, also log into Corrected collection
       if (issueStatus === "corrected") {
         await axios.post("/api/corrected", {
           image,
           predicted: prediction,
-          actual: issueType, // <-- match API field name
+          actual: issueType,
         });
       }
 
       if (res.data?.success) {
         alert("Issue submitted successfully!");
-        // clear form
         setImage(null);
         setDescription("");
         setIssueType("");
@@ -305,8 +286,7 @@ export default function Home() {
         setLongitude("");
         setPriority("");
       } else {
-        console.error("DB insert error:", res.data);
-        alert("Failed to save issue. Check server logs.");
+        alert("Failed to save issue.");
       }
     } catch (err) {
       console.error("Error submitting issue:", err);
@@ -316,7 +296,6 @@ export default function Home() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────
   return (
     <div className="flex justify-center items-center min-h-screen bg-white p-6">
       <Card className="w-full max-w-xl shadow-2xl rounded-2xl bg-gradient-to-r from-blue-50 via-blue-100 to-blue-200">
@@ -340,7 +319,7 @@ export default function Home() {
               )}
               {loadingPrediction && (
                 <p className="text-blue-600 mt-2 text-sm">
-                  ⏳ Classifying issue, please wait...
+                  ⏳ Classifying issue...
                 </p>
               )}
             </div>
@@ -351,10 +330,9 @@ export default function Home() {
               <div className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder="Click detect to fetch location"
+                  placeholder="Click detect or type manually"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  readOnly
                 />
                 <Button
                   type="button"
@@ -372,7 +350,7 @@ export default function Home() {
               <label className="text-sm font-medium">Nearby Landmark</label>
               <Input
                 type="text"
-                placeholder="E.g., Near City Mall, Opposite Bus Stop"
+                placeholder="E.g., Near City Mall"
                 value={landmark}
                 onChange={(e) => setLandmark(e.target.value)}
               />
@@ -404,8 +382,6 @@ export default function Home() {
                   </option>
                 ))}
               </select>
-
-              {/* small helper text if the user changed the selection */}
               {userModifiedIssueType && (
                 <p className="mt-2 text-sm text-yellow-700">
                   You changed the predicted issue type — this will be recorded
@@ -437,7 +413,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Get Priority + Submit buttons */}
+            {/* Priority + Submit */}
             <div className="flex gap-3">
               <Button
                 type="button"
@@ -447,7 +423,6 @@ export default function Home() {
               >
                 {loadingPriority ? "Detecting Priority..." : "Get Priority"}
               </Button>
-
               <Button
                 type="button"
                 onClick={handleSubmit}
@@ -457,26 +432,86 @@ export default function Home() {
                 {submitting ? "Submitting..." : "Submit Issue"}
               </Button>
             </div>
-          </form>
 
-          {/* Priority Result */}
-          {priority && (
-            <div className="mt-6 text-center">
-              <h2 className="text-lg font-semibold">Predicted Priority:</h2>
-              <span
-                className={`text-xl font-bold ${
-                  priority === "critical"
-                    ? "text-red-600"
-                    : priority === "normal"
-                    ? "text-yellow-500"
-                    : "text-green-600"
-                }`}
-              >
-                {priority.charAt(0).toUpperCase() + priority.slice(1)}
-              </span>
-            </div>
-          )}
+            {/* Priority Result */}
+            {priority && (
+              <div className="mt-6 text-center">
+                <h2 className="text-lg font-semibold">Predicted Priority:</h2>
+                <span
+                  className={`text-xl font-bold ${
+                    priority === "critical"
+                      ? "text-red-600"
+                      : priority === "normal"
+                      ? "text-yellow-500"
+                      : "text-green-600"
+                  }`}
+                >
+                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                </span>
+              </div>
+            )}
+          </form>
+          {/* Top 3 similar issues */}
         </CardContent>
+        {/* Top 3 similar issues */}
+        {/* Top 3 similar issues */}
+        {topIssues.length > 0 && (
+          <div className="mt-6 space-y-4">
+            <h2 className="text-lg font-semibold text-center">
+              Similar Issues Nearby
+            </h2>
+            {topIssues.map((issue) => (
+              <Card key={issue._id} className="border rounded-lg">
+                <CardHeader>
+                  <CardTitle className="capitalize">
+                    {issue.issueType.replaceAll("_", " ")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {issue.image && (
+                    <img
+                      src={issue.image}
+                      alt={issue.issueType}
+                      className="h-32 w-full object-cover rounded-lg"
+                    />
+                  )}
+                  <p className="text-sm">
+                    <span className="font-semibold">Description:</span>{" "}
+                    {issue.description || "No description"}
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-semibold">Status:</span>{" "}
+                    <span
+                      className={
+                        issue.status === "open"
+                          ? "text-green-600"
+                          : issue.status === "closed"
+                          ? "text-red-600"
+                          : "text-gray-600"
+                      }
+                    >
+                      {issue.status || "unknown"}
+                    </span>
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-semibold">Landmark:</span>{" "}
+                    {issue.location?.landmark || "N/A"}
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-semibold">Location:</span>{" "}
+                    {issue.location?.fullAddress ||
+                      `${issue.location?.latitude}, ${issue.location?.longitude}` ||
+                      "N/A"}
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-semibold">Posted by:</span>{" "}
+                    {issue.usermail || "unknown"}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );
