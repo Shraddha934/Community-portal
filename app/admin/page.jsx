@@ -5,15 +5,15 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import IssueStatus from "../../components/IssueStatus";
 import IssueMap from "../../components/IssueMap";
-import Sidebar from "../../components/SideBar"; // ⬅️ new sidebar
+import Sidebar from "../../components/SideBar";
 
 export default function AdminDashboard() {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [sidebarOpen, setSidebarOpen] = useState(false); // ⬅️ sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingStatuses, setPendingStatuses] = useState({}); // track dropdown changes
 
   useEffect(() => {
     async function fetchIssues() {
@@ -49,6 +49,36 @@ export default function AdminDashboard() {
       ? issues
       : issues.filter((i) => i.status === filterStatus);
 
+  // handle dropdown change
+  const handleDropdownChange = (id, value) => {
+    setPendingStatuses((prev) => ({ ...prev, [id]: value }));
+  };
+
+  // confirm update
+  const handleConfirm = async (issue) => {
+    try {
+      const res = await axios.patch(`/api/issues/${issue._id}/status`, {
+        status: pendingStatuses[issue._id],
+      });
+
+      // Update the issues state locally
+      setIssues((prevIssues) =>
+        prevIssues.map((i) =>
+          i._id === issue._id ? { ...i, status: res.data.status } : i
+        )
+      );
+
+      // Remove the pending status
+      setPendingStatuses((prev) => {
+        const copy = { ...prev };
+        delete copy[issue._id];
+        return copy;
+      });
+    } catch (err) {
+      console.error("Error updating status:", err);
+    }
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen relative">
       <h1 className="text-3xl font-bold mb-8 text-gray-800">
@@ -57,7 +87,6 @@ export default function AdminDashboard() {
 
       {/* 📊 Analytics Bar + Sidebar Button */}
       <div className="flex justify-between items-center mb-10">
-        {/* Status Buttons */}
         <div className="flex flex-wrap gap-4">
           <Button
             variant={filterStatus === "all" ? "default" : "outline"}
@@ -69,7 +98,6 @@ export default function AdminDashboard() {
               {total}
             </Badge>
           </Button>
-
           <Button
             variant={filterStatus === "open" ? "default" : "outline"}
             className="flex items-center gap-2 shadow-sm bg-black text-white"
@@ -78,7 +106,6 @@ export default function AdminDashboard() {
             Open
             <Badge className="bg-red-500 text-white">{openCount}</Badge>
           </Button>
-
           <Button
             variant={filterStatus === "inprogress" ? "default" : "outline"}
             className="flex items-center gap-2 shadow-sm bg-black text-white"
@@ -89,7 +116,6 @@ export default function AdminDashboard() {
               {inProgressCount}
             </Badge>
           </Button>
-
           <Button
             variant={filterStatus === "resolved" ? "default" : "outline"}
             className="flex items-center gap-2 shadow-sm bg-black text-white"
@@ -100,12 +126,10 @@ export default function AdminDashboard() {
           </Button>
         </div>
 
-        {/* Sidebar Toggle (3 lines / dots) */}
         <button
           onClick={() => setSidebarOpen(true)}
           className="p-2 rounded-md hover:bg-gray-200 transition"
         >
-          {/* Hamburger Icon */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6 text-gray-700"
@@ -125,57 +149,84 @@ export default function AdminDashboard() {
 
       {/* 🗂 Issues Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredIssues.map((issue) => (
-          <Card
-            key={issue._id}
-            className="shadow-md rounded-xl hover:shadow-lg transition duration-200 bg-white"
-          >
-            <CardHeader>
-              <CardTitle className="flex justify-between items-center text-lg">
-                <span className="capitalize">
-                  {issue.issueType.replaceAll("_", " ")}
-                </span>
-                <IssueStatus issue={issue} />
-              </CardTitle>
-            </CardHeader>
+        {filteredIssues.map((issue) => {
+          const pendingValue = pendingStatuses[issue._id] ?? issue.status;
+          return (
+            <Card
+              key={issue._id}
+              className="shadow-md rounded-xl hover:shadow-lg transition duration-200 bg-white"
+            >
+              <CardHeader>
+                <CardTitle className="flex justify-between items-center text-lg">
+                  <span className="capitalize">
+                    {issue.issueType.replaceAll("_", " ")}
+                  </span>
 
-            <CardContent>
-              {issue.image && (
-                <img
-                  src={issue.image}
-                  alt="Issue"
-                  className="w-full h-40 object-cover rounded-md mb-3"
-                />
-              )}
-              <p className="text-sm text-gray-700 mb-2">
-                <b>Description:</b> {issue.description || "No description"}
-              </p>
-              <p className="text-sm text-gray-700 mb-2">
-                <b>Location:</b> {issue.location?.landmark || "Not provided"}
-              </p>
-              <p className="text-sm text-gray-700 mb-2">
-                <b>Priority:</b>{" "}
-                <span
-                  className={
-                    issue.priority === "high"
-                      ? "text-red-600 font-semibold"
-                      : issue.priority === "medium"
-                      ? "text-yellow-600 font-semibold"
-                      : "text-green-600 font-semibold"
-                  }
-                >
-                  {issue.priority}
-                </span>
-              </p>
-              <p className="text-xs text-gray-500">
-                Reported by: {issue.usermail}
-              </p>
-              <p className="text-xs text-gray-500">
-                {new Date(issue.createdAt).toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+                  {/* Dropdown + confirm button inline */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={pendingValue}
+                      onChange={(e) =>
+                        handleDropdownChange(issue._id, e.target.value)
+                      }
+                      className="border rounded-md px-2 py-1 text-sm"
+                    >
+                      <option value="open">Open</option>
+                      <option value="inprogress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                    </select>
+
+                    {pendingValue !== issue.status && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleConfirm(issue)}
+                        className="bg-blue-600 text-white"
+                      >
+                        Confirm
+                      </Button>
+                    )}
+                  </div>
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                {issue.image && (
+                  <img
+                    src={issue.image}
+                    alt="Issue"
+                    className="w-full h-40 object-cover rounded-md mb-3"
+                  />
+                )}
+                <p className="text-sm text-gray-700 mb-2">
+                  <b>Description:</b> {issue.description || "No description"}
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                  <b>Location:</b> {issue.location?.landmark || "Not provided"}
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                  <b>Priority:</b>{" "}
+                  <span
+                    className={
+                      issue.priority === "high"
+                        ? "text-red-600 font-semibold"
+                        : issue.priority === "medium"
+                        ? "text-yellow-600 font-semibold"
+                        : "text-green-600 font-semibold"
+                    }
+                  >
+                    {issue.priority}
+                  </span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  Reported by: {issue.usermail}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {new Date(issue.createdAt).toLocaleString()}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* 🌍 Map Section */}

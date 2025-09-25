@@ -66,6 +66,10 @@ export async function GET(req) {
     if (searchParams.get("priority"))
       filters.priority = searchParams.get("priority");
 
+    const usermail = searchParams.get("usermail") || null; // current user
+
+    let issues;
+
     // Check if geospatial query is requested
     if (
       searchParams.get("near") === "true" &&
@@ -75,11 +79,9 @@ export async function GET(req) {
       const lat = parseFloat(searchParams.get("lat"));
       const lon = parseFloat(searchParams.get("lon"));
       const radiusKm = parseFloat(searchParams.get("radius")) || 0.5; // default 0.5 km
-
-      // Convert radius to meters for MongoDB
       const radiusMeters = radiusKm * 1000;
 
-      const nearbyIssues = await Issue.find({
+      issues = await Issue.find({
         ...filters,
         "location.coordinates": {
           $nearSphere: {
@@ -93,15 +95,85 @@ export async function GET(req) {
       })
         .sort({ createdAt: -1 })
         .lean();
-
-      return NextResponse.json({ success: true, issues: nearbyIssues });
+    } else {
+      issues = await Issue.find(filters).sort({ createdAt: -1 }).lean();
     }
 
-    // Normal fetch without geospatial
-    const issues = await Issue.find(filters).sort({ createdAt: -1 }).lean();
+    // Add "isLiked" info for current user
+    if (usermail) {
+      issues = issues.map((issue) => ({
+        ...issue,
+        isLiked: issue.likedBy?.includes(usermail),
+      }));
+    }
+
     return NextResponse.json({ success: true, issues });
   } catch (error) {
     console.error("❌ Error fetching issues:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// ✅ PATCH - toggle like/unlike
+export async function PATCH(req) {
+  try {
+    await connectToDB();
+    const body = await req.json();
+    const { issueId, usermail, commentText } = body;
+
+    if (!issueId) {
+      return NextResponse.json(
+        { success: false, error: "Missing issueId" },
+        { status: 400 }
+      );
+    }
+
+    const issue = await Issue.findById(issueId);
+    if (!issue) {
+      return NextResponse.json(
+        { success: false, error: "Issue not found" },
+        { status: 404 }
+      );
+    }
+
+    // 🔹 Handle like toggle
+    if (usermail && !commentText) {
+      let likedBy = issue.likedBy || [];
+      if (likedBy.includes(usermail)) {
+        // Unlike
+        issue.likedBy = likedBy.filter((email) => email !== usermail);
+        issue.likesCount = Math.max(0, issue.likesCount - 1);
+      } else {
+        // Like
+        likedBy.push(usermail);
+        issue.likedBy = likedBy;
+        issue.likesCount = (issue.likesCount || 0) + 1;
+      }
+    }
+
+    // 🔹 Handle adding comment
+    if (commentText && usermail) {
+      issue.comments = issue.comments || [];
+      issue.comments.push({
+        usermail,
+        text: commentText,
+        createdAt: new Date(),
+      });
+    }
+
+    await issue.save();
+
+    return NextResponse.json({
+      success: true,
+      issueId,
+      likesCount: issue.likesCount,
+      comments: issue.comments,
+    });
+  } catch (error) {
+    console.error("❌ Error updating issue:", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

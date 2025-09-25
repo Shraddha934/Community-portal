@@ -5,10 +5,19 @@ import axios from "axios";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { useUser } from "@clerk/nextjs";
+import { Heart } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function AddIssuePage() {
+  const router = useRouter();
   const issueOptions = [
     "broken_benches",
     "fallen_trees",
@@ -23,7 +32,6 @@ export default function AddIssuePage() {
   const { user } = useUser();
   const userEmail = user?.primaryEmailAddress?.emailAddress;
 
-  // States
   const [image, setImage] = useState(null);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
@@ -39,21 +47,8 @@ export default function AddIssuePage() {
   const [submitting, setSubmitting] = useState(false);
   const [userModifiedIssueType, setUserModifiedIssueType] = useState(false);
   const [topIssues, setTopIssues] = useState([]);
-
-  // Speech recognition
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
-
-  const normalizeToOptionValue = (label) => {
-    if (!label && label !== 0) return "";
-    return String(label)
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "");
-  };
-
-  const humanize = (val) => (val ? val.replaceAll("_", " ") : "");
 
   // Speech recognition setup
   useEffect(() => {
@@ -66,13 +61,10 @@ export default function AddIssuePage() {
       recognitionRef.current.lang = "en-US";
 
       recognitionRef.current.onresult = (event) => {
-        let interimTranscript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcriptChunk = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             setDescription((prev) => prev + transcriptChunk + " ");
-          } else {
-            interimTranscript += transcriptChunk;
           }
         }
       };
@@ -97,6 +89,17 @@ export default function AddIssuePage() {
       setListening(true);
     }
   };
+
+  const normalizeToOptionValue = (label) => {
+    if (!label && label !== 0) return "";
+    return String(label)
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
+  };
+
+  const humanize = (val) => (val ? val.replaceAll("_", " ") : "");
 
   // Image upload & prediction
   const handleImageChange = async (e) => {
@@ -167,7 +170,7 @@ export default function AddIssuePage() {
     );
   };
 
-  // Priority detection
+  // Get priority and fetch nearby issues
   const getPriority = async () => {
     setLoadingPriority(true);
     try {
@@ -186,7 +189,6 @@ export default function AddIssuePage() {
       }
       setPriority(raw);
 
-      // Fetch similar nearby issues
       if (issueType) {
         const duplicateRes = await axios.get("/api/issues", {
           params: {
@@ -198,7 +200,6 @@ export default function AddIssuePage() {
         });
 
         const nearbyIssues = duplicateRes.data.issues || [];
-        console.log("Nearby similar issues detected:", nearbyIssues);
         setTopIssues(nearbyIssues.slice(0, 3));
       }
     } catch (err) {
@@ -208,14 +209,13 @@ export default function AddIssuePage() {
       setLoadingPriority(false);
     }
   };
-  // Handle dropdown change
+
   const handleIssueTypeChange = (e) => {
-    const newVal = e.target.value;
-    setIssueType(newVal);
+    setIssueType(e.target.value);
     setUserModifiedIssueType(true);
   };
 
-  // Submit
+  // Submit issue
   const handleSubmit = async () => {
     if (!priority) {
       alert("Please detect priority first.");
@@ -224,7 +224,7 @@ export default function AddIssuePage() {
 
     setSubmitting(true);
     try {
-      let mappedPriority =
+      const mappedPriority =
         priority === "critical"
           ? "high"
           : priority === "normal"
@@ -240,7 +240,6 @@ export default function AddIssuePage() {
           ? "accepted"
           : "user_provided";
 
-      // Fallback for fullAddress
       const finalAddress = address || `${latitude}, ${longitude}`;
 
       const payload = {
@@ -260,8 +259,6 @@ export default function AddIssuePage() {
         issueStatus,
         predicted: prediction || null,
       };
-
-      console.log("Submitting issue payload:", payload); // <-- log payload
 
       const res = await axios.post("/api/issues", payload);
 
@@ -285,6 +282,7 @@ export default function AddIssuePage() {
         setLatitude("");
         setLongitude("");
         setPriority("");
+        setTopIssues([]);
       } else {
         alert("Failed to save issue.");
       }
@@ -296,8 +294,49 @@ export default function AddIssuePage() {
     }
   };
 
+  // Toggle Like
+  const toggleLike = async (issueId) => {
+    if (!user) {
+      alert("Please sign in to vote!");
+      return;
+    }
+
+    try {
+      // Optimistic UI update
+      setTopIssues((prev) =>
+        prev.map((issue) =>
+          issue._id === issueId
+            ? {
+                ...issue,
+                isLiked: !issue.isLiked,
+                likesCount: issue.isLiked
+                  ? (issue.likesCount || 1) - 1
+                  : (issue.likesCount || 0) + 1,
+              }
+            : issue
+        )
+      );
+
+      // Call backend to persist like/unlike
+      const res = await fetch("/api/issues", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issueId,
+          usermail: user.primaryEmailAddress?.emailAddress,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) console.error("Like failed:", data.error);
+    } catch (err) {
+      console.error("Error toggling like:", err);
+    }
+  };
+
   return (
-    <div className="flex justify-center items-center min-h-screen bg-white p-6">
+    <div className="flex flex-col items-center gap-8 min-h-screen bg-white p-6">
+      {/* Add Issue Form */}
       <Card className="w-full max-w-xl shadow-2xl rounded-2xl bg-gradient-to-r from-blue-50 via-blue-100 to-blue-200">
         <CardHeader>
           <CardTitle className="text-center text-2xl font-bold text-indigo-700">
@@ -324,7 +363,7 @@ export default function AddIssuePage() {
               )}
             </div>
 
-            {/* Location Detection */}
+            {/* Location */}
             <div>
               <label className="text-sm font-medium">Detected Location</label>
               <div className="flex gap-2">
@@ -376,9 +415,9 @@ export default function AddIssuePage() {
                     ? "Detecting issue..."
                     : "Select Issue Type"}
                 </option>
-                {issueOptions.map((issue) => (
-                  <option key={issue} value={issue}>
-                    {issue.replaceAll("_", " ")}
+                {issueOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt.replaceAll("_", " ")}
                   </option>
                 ))}
               </select>
@@ -451,68 +490,90 @@ export default function AddIssuePage() {
               </div>
             )}
           </form>
-          {/* Top 3 similar issues */}
         </CardContent>
-        {/* Top 3 similar issues */}
-        {/* Top 3 similar issues */}
-        {topIssues.length > 0 && (
-          <div className="mt-6 space-y-4">
-            <h2 className="text-lg font-semibold text-center">
-              Similar Issues Nearby
-            </h2>
-            {topIssues.map((issue) => (
-              <Card key={issue._id} className="border rounded-lg">
-                <CardHeader>
-                  <CardTitle className="capitalize">
-                    {issue.issueType.replaceAll("_", " ")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {issue.image && (
-                    <img
-                      src={issue.image}
-                      alt={issue.issueType}
-                      className="h-32 w-full object-cover rounded-lg"
-                    />
+      </Card>
+
+      {/* Similar Issues Section */}
+      {topIssues.length > 0 && (
+        <div className="w-full max-w-xl">
+          <h2 className="text-xl font-bold text-center mb-6">
+            🔹 Similar Issues Nearby
+          </h2>
+          <div className="grid grid-cols-1 gap-6">
+            {topIssues.map((sim) => (
+              <Card
+                key={sim._id}
+                className="shadow-md hover:shadow-lg transition cursor-pointer flex flex-col"
+                onClick={() =>
+                  router.push(`/dashboard/view-issue?id=${sim._id}`)
+                }
+              >
+                <div className="relative">
+                  <img
+                    src={sim.image || "/placeholder.jpg"}
+                    alt={sim.title || "Issue"}
+                    className="w-full h-48 object-cover rounded-t-lg"
+                  />
+                  <span className="absolute top-2 left-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-semibold text-gray-800">
+                    {sim.status?.toUpperCase() || "OPEN"}
+                  </span>
+                </div>
+
+                <CardContent className="flex-1 flex flex-col gap-2 pt-3">
+                  <p className="font-semibold text-gray-900 capitalize">
+                    🏷️ {sim.issueType?.replaceAll("_", " ") || "General"}
+                  </p>
+                  <p className="text-sm text-gray-700 flex items-center gap-1">
+                    📍 {sim.location?.fullAddress || "No address available"}
+                  </p>
+                  {sim.location?.landmark && (
+                    <p className="text-sm text-gray-600 flex items-center gap-1">
+                      🗺️ Landmark: {sim.location.landmark}
+                    </p>
                   )}
                   <p className="text-sm">
-                    <span className="font-semibold">Description:</span>{" "}
-                    {issue.description || "No description"}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">Status:</span>{" "}
+                    ⚡ Priority:{" "}
                     <span
-                      className={
-                        issue.status === "open"
-                          ? "text-green-600"
-                          : issue.status === "closed"
-                          ? "text-red-600"
-                          : "text-gray-600"
-                      }
+                      className={`px-2 py-1 rounded-full text-white text-xs ${
+                        sim.priority === "high"
+                          ? "bg-red-600"
+                          : sim.priority === "medium"
+                          ? "bg-yellow-500"
+                          : "bg-green-600"
+                      }`}
                     >
-                      {issue.status || "unknown"}
+                      {sim.priority
+                        ? sim.priority.charAt(0).toUpperCase() +
+                          sim.priority.slice(1)
+                        : "Medium"}
                     </span>
                   </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">Landmark:</span>{" "}
-                    {issue.location?.landmark || "N/A"}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">Location:</span>{" "}
-                    {issue.location?.fullAddress ||
-                      `${issue.location?.latitude}, ${issue.location?.longitude}` ||
-                      "N/A"}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-semibold">Posted by:</span>{" "}
-                    {issue.usermail || "unknown"}
-                  </p>
                 </CardContent>
+
+                <CardFooter className="flex justify-between items-center px-4 py-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`flex items-center gap-1 ${
+                      sim.isLiked ? "text-red-600" : "text-gray-600"
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleLike(sim._id);
+                    }}
+                  >
+                    <Heart size={16} />
+                    {sim.likesCount || 0}
+                  </Button>
+                  <span className="text-xs text-gray-500">
+                    {sim.comments?.length || 0} comments
+                  </span>
+                </CardFooter>
               </Card>
             ))}
           </div>
-        )}
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,12 +4,12 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heart, Search, Plus, FileText } from "lucide-react";
+import { Heart, Search, Plus, FileText, MessageCircle } from "lucide-react";
+
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const [issues, setIssues] = useState([]);
-  const [liked, setLiked] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [fabOpen, setFabOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -41,7 +41,7 @@ export default function DashboardPage() {
   }, []);
 
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
 
   // Fetch issues from backend with filters
   useEffect(() => {
@@ -56,6 +56,9 @@ export default function DashboardPage() {
           params.append("lat", userLat);
           params.append("lon", userLng);
           params.append("radius", filters.radius); // in km
+        }
+        if (user?.primaryEmailAddress?.emailAddress) {
+          params.append("usermail", user.primaryEmailAddress.emailAddress);
         }
 
         const res = await fetch(`/api/issues?${params.toString()}`, {
@@ -77,13 +80,45 @@ export default function DashboardPage() {
     };
 
     fetchIssues();
-  }, [filters, userLat, userLng]);
+  }, [filters, userLat, userLng, user]);
 
-  // Toggle like
-  const toggleLike = (id) => {
-    setLiked((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+  // Toggle like button
+  const toggleLike = async (issueId) => {
+    if (!isSignedIn || !user) {
+      alert("Please sign in to vote!");
+      return;
+    }
+
+    try {
+      // Optimistic UI update
+      setIssues((prev) =>
+        prev.map((issue) =>
+          issue._id === issueId
+            ? {
+                ...issue,
+                isLiked: !issue.isLiked,
+                likesCount: issue.isLiked
+                  ? issue.likesCount - 1
+                  : issue.likesCount + 1,
+              }
+            : issue
+        )
+      );
+
+      // Call backend to persist like/unlike
+      const res = await fetch("/api/issues", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issueId,
+          usermail: user.primaryEmailAddress.emailAddress,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) console.error("Like failed:", data.error);
+    } catch (err) {
+      console.error("Error toggling like:", err);
+    }
   };
 
   // Handle filter change
@@ -220,12 +255,8 @@ export default function DashboardPage() {
             </div>
 
             <CardContent className="pt-4">
-              <h2 className="text-sm font-bold">{issue.title || "Untitled"}</h2>
               <p className="text-lg text-black-600 capitalize font-bold">
-                🏷️{" "}
-                {issue.issueType
-                  ? issue.issueType.replaceAll("_", " ")
-                  : "General"}
+                🏷️ {issue.issueType?.replaceAll("_", " ") || "General"}
               </p>
               <p className="mt-2 text-sm font-semibold">
                 ⚡ Priority:{" "}
@@ -245,7 +276,6 @@ export default function DashboardPage() {
                 </span>
               </p>
 
-              {/* 🔹 Show full address */}
               <div className="mt-2 text-sm text-gray-700 space-y-1">
                 {issue.location?.landmark && (
                   <p className="flex items-center gap-2">
@@ -267,17 +297,43 @@ export default function DashboardPage() {
                 {issue.location?.landmark || "Unknown"}
               </span>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className={`flex items-center gap-1 ${
-                  liked.includes(issue._id) ? "text-red-600" : "text-gray-600"
-                }`}
-                onClick={() => toggleLike(issue._id)}
-              >
-                <Heart size={16} />
-                {liked.includes(issue._id) ? "Voted" : "Vote"}
-              </Button>
+              <div className="flex gap-2">
+                {/* Like Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`flex items-center gap-1 ${
+                    issue.isLiked ? "text-red-600" : "text-gray-600"
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation(); // prevent card click
+                    toggleLike(issue._id);
+                  }}
+                >
+                  <Heart size={20} />
+                  {issue.likesCount || 0}
+                </Button>
+
+                {/* Comment Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`flex items-center gap-1 ${
+                    issue.comments?.length > 0
+                      ? "text-blue-600"
+                      : "text-gray-600"
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(
+                      `/dashboard/view-issue?id=${issue._id}#comments`
+                    );
+                  }}
+                >
+                  <MessageCircle size={16} />
+                  {issue.comments?.length || 0}
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         ))}

@@ -25,6 +25,18 @@ const IssueSchema = new mongoose.Schema(
     description: String,
     criticality: String,
     title: String,
+    // 🔹 New fields for likes
+    likesCount: { type: Number, default: 0 },
+    likedBy: { type: [String], default: [] },
+    // storing Clerk user IDs or emails
+
+    comments: [
+      {
+        usermail: { type: String, required: true }, // Clerk email of commenter
+        text: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
