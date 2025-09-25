@@ -2,7 +2,7 @@ import Issue from "../../../../models/Issues";
 import connectToDB from "../../../../lib/mongoose";
 
 export async function GET(req, { params }) {
-  const { id } = params;
+  const { id } = await params;
   await connectToDB();
 
   try {
