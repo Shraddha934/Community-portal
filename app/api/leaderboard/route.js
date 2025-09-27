@@ -1,15 +1,33 @@
+// /api/points/route.js
+import { NextResponse } from "next/server";
+import connectToDB from "../../../lib/mongoose";
 import User from "../../../models/User";
-import dbConnect from "@/lib/dbConnect";
 
-export async function GET() {
-  await dbConnect();
+export async function GET(req) {
+  try {
+    await connectToDB();
 
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const url = new URL(req.url);
+    const email = url.searchParams.get("email");
 
-  const topUsers = await User.find({ updatedAt: { $gte: startOfMonth } })
-    .sort({ points: -1 })
-    .limit(5)
-    .select("name email points");
+    if (!email) {
+      return NextResponse.json(
+        { error: "Email not provided" },
+        { status: 400 }
+      );
+    }
 
-  return Response.json(topUsers);
+    const user = await User.findOne({ email });
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ points: user.points || 0 });
+  } catch (err) {
+    console.error("Error in GET /api/points:", err);
+    return NextResponse.json(
+      { error: "Failed to fetch points" },
+      { status: 500 }
+    );
+  }
 }

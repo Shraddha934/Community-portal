@@ -22,7 +22,16 @@ export default function MyIssuesPage() {
         setLoading(true);
         // Pass email as query param
         const res = await axios.get(`/api/my-issues?email=${userEmail}`);
-        setIssues(res.data);
+        const totalPoints = res.data.points;
+        const userIssues = res.data.issues;
+
+        const pointsPerIssue = userIssues.length > 0 ? Math.floor(totalPoints / userIssues.length) : 0;
+        setIssues(
+          res.data.issues.map((issue) => ({
+            ...issue,
+            userPoints: pointsPerIssue,
+          }))
+        );
       } catch (err) {
         console.error("Error fetching issues:", err);
       } finally {
@@ -80,6 +89,9 @@ export default function MyIssuesPage() {
                   >
                     {issue.criticality}
                   </span>
+                </p>
+                <p className="mt-2 text-sm font-semibold text-blue-600">
+                  🎯 Points: {issue.userPoints}
                 </p>
               </CardContent>
             </Card>

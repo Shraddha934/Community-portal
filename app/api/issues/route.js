@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import connectToDB from "../../../lib/mongoose";
 import Issue from "../../../models/Issues";
+import User from "../../../models/User";
 
 // ✅ POST - create a new issue
 export async function POST(req) {
@@ -39,6 +40,24 @@ export async function POST(req) {
       description: description || "",
       criticality: criticality || "Normal",
     });
+
+    // ✅ Award points (+3 for reporting an issue)
+    if (usermail) {
+      const result = await User.updateOne(
+        { email: usermail },
+        { $inc: { points: 3 } },
+        { upsert: true }
+      );
+
+      console.log("🎯 Gamification Update:", {
+        user: usermail,
+        updateResult: result,
+      });
+
+      // ✅ (Optional) fetch user to log new points value
+      const updatedUser = await User.findOne({ email: usermail });
+      console.log(`✅ ${usermail} now has ${updatedUser.points} points`);
+    }
 
     return NextResponse.json(
       { success: true, issue: newIssue },
@@ -165,11 +184,6 @@ export async function PATCH(req) {
     }
 
     await issue.save();
-
-    await User.updateOne(
-      { email: req.body.usermail },
-      { $inc: { points: 3 } } // +3 points per issue
-    );
 
     return NextResponse.json({
       success: true,

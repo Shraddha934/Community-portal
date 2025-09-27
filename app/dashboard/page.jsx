@@ -4,8 +4,15 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heart, Search, Plus, FileText, MessageCircle } from "lucide-react";
-
+import {
+  Heart,
+  Search,
+  Plus,
+  FileText,
+  MessageCircle,
+  CoinsIcon,
+} from "lucide-react";
+import { Coins } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
@@ -14,6 +21,7 @@ export default function DashboardPage() {
   const [fabOpen, setFabOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [points, setPoints] = useState(0);
 
   // Filters state
   const [filters, setFilters] = useState({
@@ -81,6 +89,19 @@ export default function DashboardPage() {
 
     fetchIssues();
   }, [filters, userLat, userLng, user]);
+
+  // Fetch points from leaderboard API
+  useEffect(() => {
+    if (fabOpen) {
+      fetch("/dashboard/leaderboard")
+        .then((res) => res.json())
+        .then((data) => {
+          // Assuming API returns { points: 123 }
+          setPoints(data.points || 0);
+        })
+        .catch((err) => console.error(err));
+    }
+  }, [fabOpen]);
 
   // Toggle like button
   const toggleLike = async (issueId) => {
@@ -355,11 +376,19 @@ export default function DashboardPage() {
             >
               <Plus className="mr-2 h-4 w-4" /> Add New Issue
             </Button>
+
             <Button
               className="rounded-full bg-gray-300 text-black"
               onClick={() => router.push("/dashboard/my-issue")}
             >
               <FileText className="mr-2 h-4 w-4" /> My Issues
+            </Button>
+
+            <Button
+              className="rounded-full bg-gray-300 text-black"
+              onClick={() => router.push("/dashboard/leaderboard")}
+            >
+              <Coins className="mr-2 h-4 w-4" /> View Points ({points})
             </Button>
           </>
         )}
