@@ -30,6 +30,12 @@ export default function ViewIssuePage() {
   const [description, setDescription] = useState("");
   const [landmark, setLandmark] = useState("");
 
+  // Check if logged-in user is the owner of the issue
+  const isOwner =
+    isLoaded &&
+    isSignedIn &&
+    user?.emailAddresses?.[0]?.emailAddress === issue?.usermail;
+
   // Fetch issue
   useEffect(() => {
     if (!id) return;
@@ -175,15 +181,18 @@ export default function ViewIssuePage() {
           <Button size="sm" variant="outline" onClick={() => router.back()}>
             Back
           </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={handleDelete}
-            className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
-          >
-            <TrashIcon className="w-4 h-4 " />
-            Delete
-          </Button>
+
+          {isOwner && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleDelete}
+              className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
+            >
+              <TrashIcon className="w-4 h-4 " />
+              Delete
+            </Button>
+          )}
         </div>
 
         {/* Right: Issue ID */}
@@ -254,7 +263,7 @@ export default function ViewIssuePage() {
           <div className="relative">
             <h2 className="font-semibold text-gray-800 mb-2 flex items-center justify-between">
               Description
-              {!editDesc && (
+              {!editDesc && isOwner && (
                 <PencilIcon
                   className="w-5 h-5 text-gray-500 cursor-pointer"
                   onClick={() => setEditDesc(true)}
@@ -290,7 +299,7 @@ export default function ViewIssuePage() {
             <div className="relative mt-4">
               <h2 className="font-semibold text-gray-800 mb-2 flex items-center justify-between">
                 Landmark
-                {!editLandmark && (
+                {!editLandmark && isOwner && (
                   <PencilIcon
                     className="w-5 h-5 text-gray-500 cursor-pointer"
                     onClick={() => setEditLandmark(true)}
