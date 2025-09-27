@@ -12,13 +12,90 @@ import {
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
+// Remove default marker config
 delete L.Icon.Default.prototype._getIconUrl;
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "/leaflet/marker-icon-2x.png",
-  iconUrl: "/leaflet/marker-icon.png",
-  shadowUrl: "/leaflet/marker-shadow.png",
-});
+// Custom colored marker icons
+const statusIcons = {
+  open: L.icon({
+    iconUrl: "/leaflet/marker-icon-2x-red.png",
+    shadowUrl: "/leaflet/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  }),
+  inprogress: L.icon({
+    iconUrl: "/leaflet/marker-icon-2x-gold.png",
+    shadowUrl: "/leaflet/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  }),
+  resolved: L.icon({
+    iconUrl: "/leaflet/marker-icon-2x-green.png",
+    shadowUrl: "/leaflet/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  }),
+  default: L.icon({
+    iconUrl: "/leaflet/marker-icon.png",
+    shadowUrl: "/leaflet/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  }),
+};
+
+// Legend component
+const Legend = () => {
+  const map = useMap();
+
+  useEffect(() => {
+    const legend = L.control({ position: "bottomright" });
+
+    legend.onAdd = () => {
+      const div = L.DomUtil.create("div", "info legend");
+      div.innerHTML = `
+       <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:bold;">Status Legend</h4>
+    <div style="display:flex; align-items:center; margin-bottom:6px;">
+      <img src="/leaflet/marker-icon-2x-red.png" style="width:20px; height:30px; margin-right:8px;" />
+      <span style="font-size:13px;">Open</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:6px;">
+      <img src="/leaflet/marker-icon-2x-gold.png" style="width:20px; height:30px; margin-right:8px;" />
+      <span style="font-size:13px;">In Progress</span>
+    </div>
+    <div style="display:flex; align-items:center;">
+      <img src="/leaflet/marker-icon-2x-green.png" style="width:20px; height:30px; margin-right:8px;" />
+      <span style="font-size:13px;">Resolved</span>
+    </div>
+      `;
+
+      // ✅ styling must be applied inside here
+      div.style.background = "white";
+      div.style.padding = "10px 14px";
+      div.style.borderRadius = "8px";
+      div.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
+      div.style.fontFamily = "Arial, sans-serif";
+      div.style.minWidth = "160px";
+
+      return div;
+    };
+
+    legend.addTo(map);
+
+    return () => {
+      legend.remove();
+    };
+  }, [map]);
+
+  return null;
+};
 
 // Component to recenter on user location
 const RecenterOnUser = ({ userLocation }) => {
@@ -90,6 +167,9 @@ const LeafletMap = ({ issues }) => {
           attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
         />
 
+        {/* Legend box */}
+        <Legend />
+
         {/* User location */}
         {userLocation && (
           <>
@@ -130,7 +210,14 @@ const LeafletMap = ({ issues }) => {
             if (!lat || !lng) return null;
 
             return (
-              <Marker key={issue._id} position={[lat, lng]}>
+              <Marker
+                key={issue._id}
+                position={[lat, lng]}
+                icon={
+                  statusIcons[issue.status?.toLowerCase() || "default"] ||
+                  statusIcons.default
+                }
+              >
                 <Popup maxWidth={300}>
                   <div className="w-[260px]">
                     {issue.image && (

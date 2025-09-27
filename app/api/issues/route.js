@@ -166,6 +166,11 @@ export async function PATCH(req) {
 
     await issue.save();
 
+    await User.updateOne(
+      { email: req.body.usermail },
+      { $inc: { points: 3 } } // +3 points per issue
+    );
+
     return NextResponse.json({
       success: true,
       issueId,
