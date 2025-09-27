@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@clerk/nextjs";
+import {
+  PencilIcon,
+  CheckIcon,
+  XMarkIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
 
 export default function ViewIssuePage() {
   const searchParams = useSearchParams();
@@ -18,10 +24,15 @@ export default function ViewIssuePage() {
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState([]);
 
-  // Fetch issue from API
+  // Inline edit states
+  const [editDesc, setEditDesc] = useState(false);
+  const [editLandmark, setEditLandmark] = useState(false);
+  const [description, setDescription] = useState("");
+  const [landmark, setLandmark] = useState("");
+
+  // Fetch issue
   useEffect(() => {
     if (!id) return;
-
     const fetchIssue = async () => {
       try {
         const res = await fetch(`/api/single-issue/${id}`);
@@ -29,6 +40,8 @@ export default function ViewIssuePage() {
         if (data.success) {
           setIssue(data.issue);
           setComments(data.issue.comments || []);
+          setDescription(data.issue.description || "");
+          setLandmark(data.issue.location?.landmark || "");
         } else {
           setError(data.error || "Issue not found");
         }
@@ -39,25 +52,73 @@ export default function ViewIssuePage() {
         setLoading(false);
       }
     };
-
     fetchIssue();
   }, [id]);
 
-  // Handle new comment
+  // Handle update
+  const handleUpdate = async (field) => {
+    try {
+      const res = await fetch("/api/update-issue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: issue._id,
+          ...(field === "description" && { description }),
+          ...(field === "landmark" && { location: { landmark } }),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIssue(data.issue);
+        if (field === "description") setEditDesc(false);
+        if (field === "landmark") setEditLandmark(false);
+      } else {
+        alert(data.message || "Failed to update issue");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating issue");
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async () => {
+    const confirmed = confirm(
+      "⚠️ Are you sure you want to delete this issue? This action cannot be reversed!"
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch("/api/delete-issue", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: issue._id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ Issue deleted successfully!");
+        router.push("/"); // Redirect to homepage or issue list
+      } else {
+        alert(data.message || "Failed to delete issue");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting issue");
+    }
+  };
+
+  // Comment submit
   const handleCommentSubmit = async () => {
     if (!comment.trim()) return;
-
     if (!isLoaded || !isSignedIn) {
       alert("Please sign in to comment");
       return;
     }
-
     const userEmail = user?.emailAddresses?.[0]?.emailAddress;
     if (!userEmail) {
       alert("Could not get your email");
       return;
     }
-
     try {
       const res = await fetch("/api/issues", {
         method: "PATCH",
@@ -68,9 +129,6 @@ export default function ViewIssuePage() {
           commentText: comment,
         }),
       });
-
-      if (!res.ok) throw new Error("Network response not OK");
-
       const data = await res.json();
       if (data.success) {
         setComments(data.comments.reverse());
@@ -97,13 +155,11 @@ export default function ViewIssuePage() {
     inprogress: "bg-yellow-100 text-yellow-800",
     resolved: "bg-blue-100 text-blue-800",
   };
-
   const priorityColor = {
     high: "bg-red-100 text-red-800",
     medium: "bg-yellow-100 text-yellow-800",
     low: "bg-green-100 text-green-800",
   };
-
   const criticalityColor = {
     Normal: "bg-gray-100 text-gray-800",
     Critical: "bg-red-200 text-red-900",
@@ -111,28 +167,38 @@ export default function ViewIssuePage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
-      {/* Issue ID and Back Button */}
-      <div className="flex flex-col sm:flex-row-reverse justify-between items-start sm:items-center mb-6 gap-4">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 mt-20">
+      {/* Issue ID, Back & Delete */}
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+        {/* Left: Delete + Back */}
+        <div className="flex gap-2 items-center">
+          <Button size="sm" variant="outline" onClick={() => router.back()}>
+            Back
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleDelete}
+            className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
+          >
+            <TrashIcon className="w-4 h-4 " />
+            Delete
+          </Button>
+        </div>
+
+        {/* Right: Issue ID */}
         <h1 className="text-gray-500 font-semibold">Issue ID: {id}</h1>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => router.back()}
-          className="mt-2 sm:mt-0"
-        >
-          Back
-        </Button>
       </div>
 
       {/* Main content */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left: Issue Details */}
+        {/* Left: Details */}
         <div className="flex-1 flex flex-col gap-4">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
             {issue.title || "Untitled Issue"}
           </h1>
 
+          {/* Status, priority, criticality */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <div>
@@ -162,6 +228,7 @@ export default function ViewIssuePage() {
                 </span>
               </div>
             </div>
+
             <div className="flex flex-col gap-2">
               <div>
                 <span className="font-semibold mr-2">Criticality:</span>
@@ -183,27 +250,85 @@ export default function ViewIssuePage() {
             </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <h2 className="font-semibold text-gray-800 mb-2">Description</h2>
-            <p className="text-gray-700">
-              {issue.description || "No description provided"}
-            </p>
+          {/* Description with inline edit */}
+          <div className="relative">
+            <h2 className="font-semibold text-gray-800 mb-2 flex items-center justify-between">
+              Description
+              {!editDesc && (
+                <PencilIcon
+                  className="w-5 h-5 text-gray-500 cursor-pointer"
+                  onClick={() => setEditDesc(true)}
+                />
+              )}
+            </h2>
+            {editDesc ? (
+              <div className="flex gap-2">
+                <textarea
+                  className="border p-2 rounded w-full"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+                <CheckIcon
+                  className="w-6 h-6 text-green-600 cursor-pointer"
+                  onClick={() => handleUpdate("description")}
+                />
+                <XMarkIcon
+                  className="w-6 h-6 text-red-600 cursor-pointer"
+                  onClick={() => {
+                    setEditDesc(false);
+                    setDescription(issue.description || "");
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="text-gray-700">{description || "No description"}</p>
+            )}
           </div>
 
-          {/* Location */}
+          {/* Landmark with inline edit */}
           {issue.location && (
-            <div>
-              <h2 className="font-semibold text-gray-800 mb-2">Location</h2>
-              <p className="text-gray-700">
-                <span className="font-semibold">Landmark:</span>{" "}
-                {issue.location.landmark || "N/A"}
-              </p>
-              <p className="text-gray-700">
-                <span className="font-semibold">Address:</span>{" "}
-                {issue.location.fullAddress || "N/A"}
-              </p>
+            <div className="relative mt-4">
+              <h2 className="font-semibold text-gray-800 mb-2 flex items-center justify-between">
+                Landmark
+                {!editLandmark && (
+                  <PencilIcon
+                    className="w-5 h-5 text-gray-500 cursor-pointer"
+                    onClick={() => setEditLandmark(true)}
+                  />
+                )}
+              </h2>
+              {editLandmark ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="border p-2 rounded w-full"
+                    value={landmark}
+                    onChange={(e) => setLandmark(e.target.value)}
+                  />
+                  <CheckIcon
+                    className="w-6 h-6 text-green-600 cursor-pointer"
+                    onClick={() => handleUpdate("landmark")}
+                  />
+                  <XMarkIcon
+                    className="w-6 h-6 text-red-600 cursor-pointer"
+                    onClick={() => {
+                      setEditLandmark(false);
+                      setLandmark(issue.location?.landmark || "");
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="text-gray-700">{landmark || "N/A"}</p>
+              )}
             </div>
+          )}
+
+          {/* Address */}
+          {issue.location && (
+            <p className="text-gray-700 mt-2">
+              <span className="font-semibold">Address:</span>{" "}
+              {issue.location.fullAddress || "N/A"}
+            </p>
           )}
         </div>
 
@@ -237,7 +362,6 @@ export default function ViewIssuePage() {
           </div>
         )}
 
-        {/* Add new comment */}
         <div className="flex gap-2 mt-4">
           <input
             type="text"
