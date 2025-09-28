@@ -74,7 +74,12 @@ const Navbar = () => {
               <Link href="/map" className="text-gray-700 hover:text-blue-600">
                 Map
               </Link>
-
+              <Link
+                href="/useranalytics"
+                className="text-gray-700 hover:text-blue-600"
+              >
+                User Analytics
+              </Link>
               {/* Wrong predicted only for admin */}
               {role === "admin" && (
                 <Link
