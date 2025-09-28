@@ -37,6 +37,8 @@ const IssueSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    inProgressOn: { type: Date },
+    closedOn: { type: Date },
   },
   { timestamps: true }
 );

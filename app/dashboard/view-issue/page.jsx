@@ -350,7 +350,23 @@ export default function ViewIssuePage() {
           />
         </div>
       </div>
-
+      <div className="timeline">
+        <p className="text-sm text-gray-700">
+          <b>Opened On:</b> {new Date(issue.createdAt).toLocaleString()}
+        </p>
+        <p className="text-sm text-gray-700">
+          <b>In Progress On:</b>{" "}
+          {issue.inProgressOn
+            ? new Date(issue.inProgressOn).toLocaleString()
+            : "Not yet"}
+        </p>
+        <p className="text-sm text-gray-700">
+          <b>Closed On:</b>{" "}
+          {issue.closedOn
+            ? new Date(issue.closedOn).toLocaleString()
+            : "Not yet"}
+        </p>
+      </div>
       {/* Comment Section */}
       <div className="mt-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Comments</h2>
