@@ -13,7 +13,13 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [pendingStatuses, setPendingStatuses] = useState({}); // track dropdown changes
+  const [pendingStatuses, setPendingStatuses] = useState({});
+
+  // NEW FILTER STATES
+  const [filters, setFilters] = useState({
+    issueType: "",
+    priority: "",
+  });
 
   useEffect(() => {
     async function fetchIssues() {
@@ -43,11 +49,13 @@ export default function AdminDashboard() {
   ).length;
   const resolvedCount = issues.filter((i) => i.status === "resolved").length;
 
-  // 🔍 Apply filter
-  const filteredIssues =
-    filterStatus === "all"
-      ? issues
-      : issues.filter((i) => i.status === filterStatus);
+  // 🔍 Apply filters
+  const filteredIssues = issues.filter((i) => {
+    const statusOk = filterStatus === "all" || i.status === filterStatus;
+    const typeOk = !filters.issueType || i.issueType === filters.issueType;
+    const priorityOk = !filters.priority || i.priority === filters.priority;
+    return statusOk && typeOk && priorityOk;
+  });
 
   // handle dropdown change
   const handleDropdownChange = (id, value) => {
@@ -61,14 +69,12 @@ export default function AdminDashboard() {
         status: pendingStatuses[issue._id],
       });
 
-      // Update the issues state locally
       setIssues((prevIssues) =>
         prevIssues.map((i) =>
           i._id === issue._id ? { ...i, status: res.data.status } : i
         )
       );
 
-      // Remove the pending status
       setPendingStatuses((prev) => {
         const copy = { ...prev };
         delete copy[issue._id];
@@ -85,65 +91,90 @@ export default function AdminDashboard() {
         📊 Admin Dashboard
       </h1>
 
-      {/* 📊 Analytics Bar + Sidebar Button */}
-      <div className="flex justify-between items-center mb-10">
-        <div className="flex flex-wrap gap-4">
+      {/* 📊 Analytics Bar + Filters + Sidebar */}
+      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+        {/* Left: Status Buttons */}
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={filterStatus === "all" ? "default" : "outline"}
-            className="flex items-center gap-2 shadow-sm"
             onClick={() => setFilterStatus("all")}
           >
-            Total
-            <Badge variant="secondary" className="bg-gray-200 text-gray-800">
-              {total}
-            </Badge>
+            Total <Badge>{total}</Badge>
           </Button>
           <Button
             variant={filterStatus === "open" ? "default" : "outline"}
-            className="flex items-center gap-2 shadow-sm bg-black text-white"
             onClick={() => setFilterStatus("open")}
           >
-            Open
-            <Badge className="bg-red-500 text-white">{openCount}</Badge>
+            Open <Badge className="bg-red-500 text-white">{openCount}</Badge>
           </Button>
           <Button
             variant={filterStatus === "inprogress" ? "default" : "outline"}
-            className="flex items-center gap-2 shadow-sm bg-black text-white"
             onClick={() => setFilterStatus("inprogress")}
           >
-            In Progress
+            In Progress{" "}
             <Badge className="bg-yellow-500 text-white">
               {inProgressCount}
             </Badge>
           </Button>
           <Button
             variant={filterStatus === "resolved" ? "default" : "outline"}
-            className="flex items-center gap-2 shadow-sm bg-black text-white"
             onClick={() => setFilterStatus("resolved")}
           >
-            Resolved
+            Resolved{" "}
             <Badge className="bg-green-500 text-white">{resolvedCount}</Badge>
           </Button>
         </div>
 
+        {/* Middle: Dropdowns */}
+        <div className="flex flex-wrap gap-3">
+          {/* Issue Type */}
+          <select
+            value={filters.issueType}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, issueType: e.target.value }))
+            }
+            className="border rounded px-2 py-1"
+          >
+            <option value="">All</option>
+            <option value="broken_benches">Broken Benches</option>
+            <option value="fallen_trees">Fallen Trees</option>
+            <option value="garbage">Garbage</option>
+            <option value="leaky_pipes">Leaky Pipes</option>
+            <option value="open_manhole">Open Manhole</option>
+            <option value="potholes">Potholes</option>
+            <option value="streetlight">Streetlight</option>
+          </select>
+
+          {/* Priority */}
+          <select
+            value={filters.priority}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, priority: e.target.value }))
+            }
+            className="border rounded px-2 py-1"
+          >
+            <option value="">All Priorities</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+
+          {/* Reset */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilters({ issueType: "", priority: "" })}
+          >
+            Reset
+          </Button>
+        </div>
+
+        {/* Right: Sidebar Button */}
         <button
           onClick={() => setSidebarOpen(true)}
           className="p-2 rounded-md hover:bg-gray-200 transition"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 text-gray-700"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
+          ☰
         </button>
       </div>
 
@@ -154,15 +185,13 @@ export default function AdminDashboard() {
           return (
             <Card
               key={issue._id}
-              className="shadow-md rounded-xl hover:shadow-lg transition duration-200 bg-white"
+              className="shadow-md rounded-xl hover:shadow-lg transition bg-white"
             >
               <CardHeader>
                 <CardTitle className="flex justify-between items-center text-lg">
                   <span className="capitalize">
                     {issue.issueType.replaceAll("_", " ")}
                   </span>
-
-                  {/* Dropdown + confirm button inline */}
                   <div className="flex items-center gap-2">
                     <select
                       value={pendingValue}
@@ -175,7 +204,6 @@ export default function AdminDashboard() {
                       <option value="inprogress">In Progress</option>
                       <option value="resolved">Resolved</option>
                     </select>
-
                     {pendingValue !== issue.status && (
                       <Button
                         size="sm"
@@ -197,13 +225,13 @@ export default function AdminDashboard() {
                     className="w-full h-40 object-cover rounded-md mb-3"
                   />
                 )}
-                <p className="text-sm text-gray-700 mb-2">
+                <p className="text-sm">
                   <b>Description:</b> {issue.description || "No description"}
                 </p>
-                <p className="text-sm text-gray-700 mb-2">
+                <p className="text-sm">
                   <b>Location:</b> {issue.location?.landmark || "Not provided"}
                 </p>
-                <p className="text-sm text-gray-700 mb-2">
+                <p className="text-sm">
                   <b>Priority:</b>{" "}
                   <span
                     className={
@@ -217,12 +245,6 @@ export default function AdminDashboard() {
                     {issue.priority}
                   </span>
                 </p>
-                <p className="text-xs text-gray-500">
-                  Reported by: {issue.usermail}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {new Date(issue.createdAt).toLocaleString()}
-                </p>
               </CardContent>
             </Card>
           );
@@ -235,7 +257,7 @@ export default function AdminDashboard() {
       </h2>
       <IssueMap issues={filteredIssues} />
 
-      {/* Sidebar Component */}
+      {/* Sidebar */}
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} issues={issues} />
     </div>
   );
