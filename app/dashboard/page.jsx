@@ -10,10 +10,10 @@ import {
   Plus,
   FileText,
   MessageCircle,
-  CoinsIcon,
+  Coins,
 } from "lucide-react";
-import { Coins } from "lucide-react";
 import { useRouter } from "next/navigation";
+import LeaderboardModal from "../../components/LeaderboardModal";
 
 export default function DashboardPage() {
   const [issues, setIssues] = useState([]);
@@ -22,18 +22,19 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [points, setPoints] = useState(0);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  // Filters state
   const [filters, setFilters] = useState({
     status: "",
     issueType: "",
     priority: "",
-    radius: "", // in km
+    radius: "",
   });
 
-  // User location
   const [userLat, setUserLat] = useState(null);
   const [userLng, setUserLng] = useState(null);
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -51,7 +52,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { isSignedIn, user } = useUser();
 
-  // Fetch issues from backend with filters
+  // Fetch issues
   useEffect(() => {
     const fetchIssues = async () => {
       try {
@@ -63,7 +64,7 @@ export default function DashboardPage() {
           params.append("near", "true");
           params.append("lat", userLat);
           params.append("lon", userLng);
-          params.append("radius", filters.radius); // in km
+          params.append("radius", filters.radius);
         }
         if (user?.primaryEmailAddress?.emailAddress) {
           params.append("usermail", user.primaryEmailAddress.emailAddress);
@@ -90,20 +91,19 @@ export default function DashboardPage() {
     fetchIssues();
   }, [filters, userLat, userLng, user]);
 
-  // Fetch points from leaderboard API
+  // Fetch points
   useEffect(() => {
     if (fabOpen) {
-      fetch("/dashboard/leaderboard")
+      fetch("/api/leaderboard")
         .then((res) => res.json())
         .then((data) => {
-          // Assuming API returns { points: 123 }
           setPoints(data.points || 0);
         })
         .catch((err) => console.error(err));
     }
   }, [fabOpen]);
 
-  // Toggle like button
+  // Toggle like
   const toggleLike = async (issueId) => {
     if (!isSignedIn || !user) {
       alert("Please sign in to vote!");
@@ -111,7 +111,6 @@ export default function DashboardPage() {
     }
 
     try {
-      // Optimistic UI update
       setIssues((prev) =>
         prev.map((issue) =>
           issue._id === issueId
@@ -126,7 +125,6 @@ export default function DashboardPage() {
         )
       );
 
-      // Call backend to persist like/unlike
       const res = await fetch("/api/issues", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -142,7 +140,22 @@ export default function DashboardPage() {
     }
   };
 
-  // Handle filter change
+  // Fetch leaderboard
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await fetch("/api/leaderboard");
+        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+        const data = await res.json();
+        setLeaderboard(data.leaderboard || []);
+      } catch (err) {
+        console.error("Failed to fetch leaderboard:", err);
+      }
+    };
+
+    fetchLeaderboard();
+  }, []);
+
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -150,7 +163,6 @@ export default function DashboardPage() {
   if (loading) return <p className="text-center">Loading issues...</p>;
   if (error) return <p className="text-center text-red-500">{error}</p>;
 
-  // Client-side search filtering
   const searchedIssues = issues.filter((issue) => {
     const query = searchQuery.toLowerCase();
     return (
@@ -163,7 +175,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-8 mt-10">
-      {/* 🔹 Filters Bar */}
+      {/* Filters Bar */}
       <div className="bg-white shadow-md rounded-xl p-4 mb-8 flex flex-wrap items-center gap-4 justify-center">
         {/* Status */}
         <div className="flex items-center gap-2">
@@ -240,9 +252,25 @@ export default function DashboardPage() {
         >
           Reset
         </button>
+
+        {/* Leaderboard button */}
+        <button
+          onClick={() => setShowLeaderboard(true)}
+          className="ml-2 px-4 py-1 rounded-full text-sm font-semibold bg-yellow-400 hover:bg-yellow-500 text-black shadow-md transition"
+        >
+          View Leaderboard 🏆
+        </button>
+
+        {/* Modal popup */}
+        {showLeaderboard && (
+          <LeaderboardModal
+            leaderboard={leaderboard}
+            onClose={() => setShowLeaderboard(false)}
+          />
+        )}
       </div>
 
-      {/* 🔍 Search Bar */}
+      {/* Search Bar */}
       <div className="flex justify-center mb-8">
         <div className="relative w-full max-w-md">
           <Input
@@ -256,7 +284,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 📝 Issues Grid */}
+      {/* Issues Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-6">
         {searchedIssues.map((issue) => (
           <Card
@@ -327,7 +355,7 @@ export default function DashboardPage() {
                     issue.isLiked ? "text-red-600" : "text-gray-600"
                   }`}
                   onClick={(e) => {
-                    e.stopPropagation(); // prevent card click
+                    e.stopPropagation();
                     toggleLike(issue._id);
                   }}
                 >
@@ -366,7 +394,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ➕ Floating Action Button */}
+      {/* Floating Action Button */}
       <div className="fixed bottom-10 right-10 flex flex-col items-end gap-3">
         {fabOpen && isSignedIn && (
           <>
