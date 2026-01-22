@@ -27,6 +27,7 @@
     "lucide-react": "^0.542.0",
     "mongoose": "^8.18.1",
     "next": "15.4.2",
+    "nodemailer": "^7.0.12",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-leaflet": "^5.0.0",

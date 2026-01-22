@@ -203,9 +203,9 @@ export default function ViewIssuePage() {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left: Details */}
         <div className="flex-1 flex flex-col gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+          {/* <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
             {issue.title || "Untitled Issue"}
-          </h1>
+          </h1> */}
 
           {/* Status, priority, criticality */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -3,12 +3,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { UserButton, SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Bell } from "lucide-react";
 
 const Navbar = () => {
   const { isSignedIn, user } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [role, setRole] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (isSignedIn && user) {
@@ -19,17 +20,15 @@ const Navbar = () => {
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              clerkId: user.id, // store Clerk ID
+              clerkId: user.id,
               name: user.fullName,
               email: user.emailAddresses[0].emailAddress,
             }),
           });
 
           const data = await res.json();
-          console.log("User created/fetched:", data);
-
           if (data?.user?.role) {
-            setRole(data.user.role); // set role in state
+            setRole(data.user.role);
           }
         } catch (err) {
           console.error("Error creating/fetching user:", err);
@@ -40,10 +39,32 @@ const Navbar = () => {
     }
   }, [isSignedIn, user]);
 
+  // 🔔 Fetch unread notification count
+  useEffect(() => {
+    if (!isSignedIn || !user) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await fetch(
+          `/api/notifications/unread-count?email=${user.emailAddresses[0].emailAddress}`,
+        );
+        const data = await res.json();
+        setUnreadCount(data.count || 0);
+      } catch (err) {
+        console.error("Failed to fetch unread count", err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 20000);
+
+    return () => clearInterval(interval);
+  }, [isSignedIn, user]);
+
   return (
     <nav className="bg-white shadow-md border-b border-gray-200 fixed w-full top-0 left-0 z-50 py-3">
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-        {/* Logo / Brand */}
+        {/* Logo */}
         <Link href="/" className="text-2xl font-bold text-blue-600">
           Community Issue Reporting Portal
         </Link>
@@ -52,8 +73,6 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-6">
           {isSignedIn ? (
             <>
-              {/* Dashboard link based on role */}
-              {/* Dashboard link based on role */}
               {role === "admin" ? (
                 <Link
                   href="/admin"
@@ -70,17 +89,17 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Common Map link */}
               <Link href="/map" className="text-gray-700 hover:text-blue-600">
                 Map
               </Link>
+
               <Link
                 href="/useranalytics"
                 className="text-gray-700 hover:text-blue-600"
               >
                 User Analytics
               </Link>
-              {/* Wrong predicted only for admin */}
+
               {role === "admin" && (
                 <Link
                   href="/wrongpredict"
@@ -89,6 +108,16 @@ const Navbar = () => {
                   Wrong predicted
                 </Link>
               )}
+
+              {/* 🔔 Notification Bell */}
+              <Link href="/notifications" className="relative">
+                <Bell className="text-gray-700 hover:text-blue-600" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
 
               <UserButton afterSignOutUrl="/" />
             </>
@@ -117,7 +146,7 @@ const Navbar = () => {
         </button>
       </div>
 
-      {/* Mobile Menu Dropdown */}
+      {/* Mobile Menu */}
       {menuOpen && (
         <div className="md:hidden bg-white shadow-md flex flex-col items-center gap-4 py-6">
           {isSignedIn ? (
@@ -134,14 +163,12 @@ const Navbar = () => {
                 <Link
                   href="/dashboard"
                   className="text-gray-700 hover:text-blue-600"
-                  // className="text-gray-700 hover:text-blue-600"
                   onClick={() => setMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
               )}
 
-              {/* Common Map link */}
               <Link
                 href="/map"
                 className="text-gray-700 hover:text-blue-600"
@@ -150,7 +177,6 @@ const Navbar = () => {
                 Map
               </Link>
 
-              {/* Wrong predicted only for admin */}
               {role === "admin" && (
                 <Link
                   href="/wrongpredict"
@@ -160,6 +186,21 @@ const Navbar = () => {
                   Wrong predicted
                 </Link>
               )}
+
+              {/* 🔔 Mobile Notification */}
+              <Link
+                href="/notifications"
+                className="text-gray-700 hover:text-blue-600 flex items-center gap-2"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Bell size={18} />
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="bg-red-600 text-white text-xs rounded-full px-2 py-0.5">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
 
               <UserButton afterSignOutUrl="/" />
             </>
