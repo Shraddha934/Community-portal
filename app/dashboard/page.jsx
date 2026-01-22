@@ -409,14 +409,14 @@ export default function DashboardPage() {
               className="rounded-full bg-gray-300 text-black"
               onClick={() => router.push("/dashboard/my-issue")}
             >
-              <FileText className="mr-2 h-4 w-4" /> My Issues
+              <FileText className="mr-2 h-4 " /> My Issues
             </Button>
 
             <Button
               className="rounded-full bg-gray-300 text-black"
               onClick={() => router.push("/dashboard/leaderboard")}
             >
-              <Coins className="mr-2 h-4 w-4" /> View Points ({points})
+              <Coins className="mr-2 h-4 w-4" /> My Points ({points})
             </Button>
           </>
         )}
