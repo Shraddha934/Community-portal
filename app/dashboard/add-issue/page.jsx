@@ -16,8 +16,11 @@ import { useUser } from "@clerk/nextjs";
 import { Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+const ISSUE_DRAFT_KEY = "civic_issue_draft";
+
 export default function AddIssuePage() {
   const router = useRouter();
+
   const issueOptions = [
     "broken_benches",
     "fallen_trees",
@@ -48,9 +51,67 @@ export default function AddIssuePage() {
   const [userModifiedIssueType, setUserModifiedIssueType] = useState(false);
   const [topIssues, setTopIssues] = useState([]);
   const [listening, setListening] = useState(false);
+
   const recognitionRef = useRef(null);
 
-  // Speech recognition setup
+  /* =======================
+     🔁 RESTORE DRAFT (ON LOAD)
+     ======================= */
+  useEffect(() => {
+    const cached = localStorage.getItem(ISSUE_DRAFT_KEY);
+    if (!cached) return;
+
+    try {
+      const data = JSON.parse(cached);
+      setImage(data.image || null);
+      setLatitude(data.latitude || "");
+      setLongitude(data.longitude || "");
+      setAddress(data.address || "");
+      setLandmark(data.landmark || "");
+      setDescription(data.description || "");
+      setIssueType(data.issueType || "");
+      setPrediction(data.prediction || "");
+      setPriority(data.priority || "");
+    } catch (err) {
+      console.error("Invalid cached draft", err);
+    }
+  }, []);
+
+  /* =======================
+     💾 AUTO-SAVE DRAFT
+     ======================= */
+  useEffect(() => {
+    const draft = {
+      image,
+      latitude,
+      longitude,
+      address,
+      landmark,
+      description,
+      issueType,
+      prediction,
+      priority,
+    };
+
+    localStorage.setItem(ISSUE_DRAFT_KEY, JSON.stringify(draft));
+  }, [
+    image,
+    latitude,
+    longitude,
+    address,
+    landmark,
+    description,
+    issueType,
+    prediction,
+    priority,
+  ]);
+  const handleIssueTypeChange = (e) => {
+    setIssueType(e.target.value);
+    setUserModifiedIssueType(true);
+  };
+  /* =======================
+     🎙️ SPEECH RECOGNITION
+     ======================= */
   useEffect(() => {
     if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
       const SpeechRecognition =
@@ -62,46 +123,37 @@ export default function AddIssuePage() {
 
       recognitionRef.current.onresult = (event) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcriptChunk = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            setDescription((prev) => prev + transcriptChunk + " ");
+            setDescription(
+              (prev) => prev + event.results[i][0].transcript + " ",
+            );
           }
         }
       };
 
-      recognitionRef.current.onerror = (err) => {
-        console.error("Speech recognition error:", err);
-        setListening(false);
-      };
+      recognitionRef.current.onerror = () => setListening(false);
     }
   }, []);
 
   const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert("Speech Recognition not supported in this browser.");
-      return;
-    }
-    if (listening) {
-      recognitionRef.current.stop();
-      setListening(false);
-    } else {
-      recognitionRef.current.start();
-      setListening(true);
-    }
+    if (!recognitionRef.current) return;
+    listening ? recognitionRef.current.stop() : recognitionRef.current.start();
+    setListening(!listening);
   };
 
-  const normalizeToOptionValue = (label) => {
-    if (!label && label !== 0) return "";
-    return String(label)
+  const normalizeToOptionValue = (label) =>
+    label
+      ?.toString()
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "");
-  };
+      .replace(/[^a-z0-9_]/g, "") || "";
 
-  const humanize = (val) => (val ? val.replaceAll("_", " ") : "");
+  const humanize = (val) => val?.replaceAll("_", " ") || "";
 
-  // Image upload & prediction
+  /* =======================
+     📸 IMAGE + PREDICTION
+     ======================= */
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -115,62 +167,47 @@ export default function AddIssuePage() {
 
     setLoadingPrediction(true);
     try {
-      const res = await axios.post("http://127.0.0.1:5000/predict", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const raw = res.data?.class ?? "";
-      const normalized = normalizeToOptionValue(raw);
+      const res = await axios.post("http://127.0.0.1:5000/predict", formData);
+      const normalized = normalizeToOptionValue(res.data?.class);
       setIssueType(normalized);
       setPrediction(normalized);
       setUserModifiedIssueType(false);
-    } catch (error) {
-      console.error("Prediction error:", error);
-      alert("Error classifying the issue. Please try again.");
+    } catch {
+      alert("Prediction failed");
     } finally {
       setLoadingPrediction(false);
     }
   };
 
-  // Detect location
+  /* =======================
+     📍 LOCATION
+     ======================= */
   const detectLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported.");
-      return;
-    }
+    if (!navigator.geolocation) return;
 
     setLoadingLocation(true);
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        setLatitude(lat);
-        setLongitude(lon);
+      async (pos) => {
+        setLatitude(pos.coords.latitude);
+        setLongitude(pos.coords.longitude);
 
         try {
-          const res = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+          const res = await fetch(
+            `/api/reverse-geocode?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
+          );
           const data = await res.json();
-          if (data?.results && data.results.length > 0) {
-            setAddress(data.results[0].formatted_address);
-          } else {
-            setAddress(`${lat}, ${lon}`);
-          }
-        } catch (err) {
-          console.error("Reverse geocoding error:", err);
-          setAddress(`${lat}, ${lon}`);
+          setAddress(data?.results?.[0]?.formatted_address || "");
         } finally {
           setLoadingLocation(false);
         }
       },
-      (err) => {
-        console.error(err);
-        alert("Unable to retrieve location.");
-        setLoadingLocation(false);
-      }
+      () => setLoadingLocation(false),
     );
   };
 
-  // Get priority and fetch nearby issues
+  /* =======================
+     🚦 PRIORITY
+     ======================= */
   const getPriority = async () => {
     setLoadingPriority(true);
     try {
@@ -180,68 +217,20 @@ export default function AddIssuePage() {
         description,
         issueType,
       });
-
-      let raw = (res.data.priority || "").toString().trim().toLowerCase();
-      if (!["critical", "normal", "low"].includes(raw)) {
-        if (raw.includes("critical")) raw = "critical";
-        else if (raw.includes("low")) raw = "low";
-        else raw = "normal";
-      }
-      setPriority(raw);
-
-      if (issueType) {
-        const duplicateRes = await axios.get("/api/issues", {
-          params: {
-            issueType,
-            lat: latitude,
-            lon: longitude,
-            near: true,
-          },
-        });
-
-        const nearbyIssues = duplicateRes.data.issues || [];
-        setTopIssues(nearbyIssues.slice(0, 3));
-      }
-    } catch (err) {
-      console.error("Unable to get priority or fetch nearby issues.", err);
-      alert("Unable to get priority or fetch nearby issues.");
+      setPriority(res.data.priority?.toLowerCase() || "normal");
     } finally {
       setLoadingPriority(false);
     }
   };
 
-  const handleIssueTypeChange = (e) => {
-    setIssueType(e.target.value);
-    setUserModifiedIssueType(true);
-  };
-
-  // Submit issue
+  /* =======================
+     📤 SUBMIT
+     ======================= */
   const handleSubmit = async () => {
-    if (!priority) {
-      alert("Please detect priority first.");
-      return;
-    }
+    if (!priority) return alert("Detect priority first");
 
     setSubmitting(true);
     try {
-      const mappedPriority =
-        priority === "critical"
-          ? "high"
-          : priority === "normal"
-          ? "medium"
-          : "low";
-      const criticalityForDb =
-        priority.charAt(0).toUpperCase() + priority.slice(1);
-
-      const issueStatus =
-        prediction && prediction !== issueType
-          ? "corrected"
-          : prediction
-          ? "accepted"
-          : "user_provided";
-
-      const finalAddress = address || `${latitude}, ${longitude}`;
-
       const payload = {
         issueType,
         image,
@@ -249,95 +238,53 @@ export default function AddIssuePage() {
           latitude: Number(latitude),
           longitude: Number(longitude),
           landmark,
-          fullAddress: finalAddress,
+          fullAddress: address,
         },
         status: "open",
         usermail: userEmail || "unknown@example.com",
-        priority: mappedPriority,
+        priority,
         description,
-        criticality: criticalityForDb,
-        issueStatus,
-        predicted: prediction || null,
       };
 
       const res = await axios.post("/api/issues", payload);
 
-      if (issueStatus === "corrected") {
-        await axios.post("/api/corrected", {
-          image,
-          predicted: prediction,
-          actual: issueType,
-        });
-      }
-
       if (res.data?.success) {
+        localStorage.removeItem(ISSUE_DRAFT_KEY); // ✅ CLEAR CACHE
         alert("Issue submitted successfully!");
         setImage(null);
         setDescription("");
         setIssueType("");
         setPrediction("");
-        setUserModifiedIssueType(false);
         setLandmark("");
         setAddress("");
         setLatitude("");
         setLongitude("");
         setPriority("");
         setTopIssues([]);
-      } else {
-        alert("Failed to save issue.");
       }
-    } catch (err) {
-      console.error("Error submitting issue:", err);
-      alert("Error submitting issue.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Toggle Like
-  const toggleLike = async (issueId) => {
-    if (!user) {
-      alert("Please sign in to vote!");
-      return;
-    }
-
-    try {
-      // Optimistic UI update
-      setTopIssues((prev) =>
-        prev.map((issue) =>
-          issue._id === issueId
-            ? {
-                ...issue,
-                isLiked: !issue.isLiked,
-                likesCount: issue.isLiked
-                  ? (issue.likesCount || 1) - 1
-                  : (issue.likesCount || 0) + 1,
-              }
-            : issue
-        )
-      );
-
-      // Call backend to persist like/unlike
-      const res = await fetch("/api/issues", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          issueId,
-          usermail: user.primaryEmailAddress?.emailAddress,
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.success) console.error("Like failed:", data.error);
-    } catch (err) {
-      console.error("Error toggling like:", err);
-    }
+  /* =======================
+     ❤️ LIKE
+     ======================= */
+  const toggleLike = async (id) => {
+    if (!user) return alert("Login required");
+    setTopIssues((prev) =>
+      prev.map((i) =>
+        i._id === id
+          ? { ...i, isLiked: !i.isLiked, likesCount: (i.likesCount || 0) + 1 }
+          : i,
+      ),
+    );
   };
 
   return (
-    <div className="flex flex-col items-center gap-8 min-h-screen bg-white p-6">
+    <div className="flex flex-col items-center gap-8 min-h-screen bg-white p-6 ">
       {/* Add Issue Form */}
-      <Card className="w-full max-w-xl shadow-2xl rounded-2xl bg-gradient-to-r from-blue-50 via-blue-100 to-blue-200">
+      <Card className="w-full max-w-xl shadow-2xl rounded-2xl bg-gradient-to-r from-blue-50 via-blue-100 to-blue-200 ">
         <CardHeader>
           <CardTitle className="text-center text-2xl font-bold text-indigo-700">
             Civic Issue Classifier
@@ -481,8 +428,8 @@ export default function AddIssuePage() {
                     priority === "critical"
                       ? "text-red-600"
                       : priority === "normal"
-                      ? "text-yellow-500"
-                      : "text-green-600"
+                        ? "text-yellow-500"
+                        : "text-green-600"
                   }`}
                 >
                   {priority.charAt(0).toUpperCase() + priority.slice(1)}
@@ -497,8 +444,13 @@ export default function AddIssuePage() {
       {topIssues.length > 0 && (
         <div className="w-full max-w-xl">
           <h2 className="text-xl font-bold text-center mb-6">
-            🔹 Similar Issues Nearby
+            🔹 This Issue Has Been Reported Earlier
           </h2>
+          <p>
+            This issue appears to be similar to one that has already been
+            reported by another user. To avoid duplicate reports, please like
+            the existing issue to show support and help increase its priority.
+          </p>
           <div className="grid grid-cols-1 gap-6">
             {topIssues.map((sim) => (
               <Card
@@ -538,8 +490,8 @@ export default function AddIssuePage() {
                         sim.priority === "high"
                           ? "bg-red-600"
                           : sim.priority === "medium"
-                          ? "bg-yellow-500"
-                          : "bg-green-600"
+                            ? "bg-yellow-500"
+                            : "bg-green-600"
                       }`}
                     >
                       {sim.priority
