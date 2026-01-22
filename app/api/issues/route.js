@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connectToDB from "../../../lib/mongoose";
 import Issue from "../../../models/Issues";
 import User from "../../../models/User";
+import { getPriorityFromGemini } from "../../../lib/priorityAI";
 
 // ✅ POST - create a new issue
 export async function POST(req) {
@@ -14,7 +15,6 @@ export async function POST(req) {
       location,
       status,
       usermail,
-      priority,
       description,
       criticality,
       title,
@@ -36,17 +36,28 @@ export async function POST(req) {
       title: title || "Untitled Issue",
       status: status || "open",
       usermail: usermail || "unknown@example.com",
-      priority: priority || "low",
+      priority: "pending",
       description: description || "",
       criticality: criticality || "Normal",
     });
+
+    // after creating issue
+    const finalPriority = await getPriorityFromGemini({
+      image,
+      location,
+      description,
+      issueType,
+    });
+
+    newIssue.priority = finalPriority;
+    await newIssue.save();
 
     // ✅ Award points (+3 for reporting an issue)
     if (usermail) {
       const result = await User.updateOne(
         { email: usermail },
         { $inc: { points: 3 } },
-        { upsert: true }
+        { upsert: true },
       );
 
       console.log("🎯 Gamification Update:", {
@@ -61,13 +72,13 @@ export async function POST(req) {
 
     return NextResponse.json(
       { success: true, issue: newIssue },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("❌ Error creating issue:", error);
     return NextResponse.json(
       { success: false, error: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -131,7 +142,7 @@ export async function GET(req) {
     console.error("❌ Error fetching issues:", error);
     return NextResponse.json(
       { success: false, error: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -146,7 +157,7 @@ export async function PATCH(req) {
     if (!issueId) {
       return NextResponse.json(
         { success: false, error: "Missing issueId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -154,7 +165,7 @@ export async function PATCH(req) {
     if (!issue) {
       return NextResponse.json(
         { success: false, error: "Issue not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -195,7 +206,7 @@ export async function PATCH(req) {
     console.error("❌ Error updating issue:", error);
     return NextResponse.json(
       { success: false, error: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -43,10 +43,10 @@ export default function AddIssuePage() {
   const [description, setDescription] = useState("");
   const [issueType, setIssueType] = useState("");
   const [prediction, setPrediction] = useState("");
-  const [priority, setPriority] = useState("");
+ 
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [loadingPrediction, setLoadingPrediction] = useState(false);
-  const [loadingPriority, setLoadingPriority] = useState(false);
+ 
   const [submitting, setSubmitting] = useState(false);
   const [userModifiedIssueType, setUserModifiedIssueType] = useState(false);
   const [topIssues, setTopIssues] = useState([]);
@@ -71,7 +71,7 @@ export default function AddIssuePage() {
       setDescription(data.description || "");
       setIssueType(data.issueType || "");
       setPrediction(data.prediction || "");
-      setPriority(data.priority || "");
+     
     } catch (err) {
       console.error("Invalid cached draft", err);
     }
@@ -90,7 +90,6 @@ export default function AddIssuePage() {
       description,
       issueType,
       prediction,
-      priority,
     };
 
     localStorage.setItem(ISSUE_DRAFT_KEY, JSON.stringify(draft));
@@ -103,7 +102,6 @@ export default function AddIssuePage() {
     description,
     issueType,
     prediction,
-    priority,
   ]);
   const handleIssueTypeChange = (e) => {
     setIssueType(e.target.value);
@@ -205,29 +203,14 @@ export default function AddIssuePage() {
     );
   };
 
-  /* =======================
-     🚦 PRIORITY
-     ======================= */
-  const getPriority = async () => {
-    setLoadingPriority(true);
-    try {
-      const res = await axios.post("/api/prioritize", {
-        image,
-        location: { latitude, longitude, address, landmark },
-        description,
-        issueType,
-      });
-      setPriority(res.data.priority?.toLowerCase() || "normal");
-    } finally {
-      setLoadingPriority(false);
-    }
-  };
+ 
+  
 
   /* =======================
      📤 SUBMIT
      ======================= */
   const handleSubmit = async () => {
-    if (!priority) return alert("Detect priority first");
+    
 
     setSubmitting(true);
     try {
@@ -242,7 +225,6 @@ export default function AddIssuePage() {
         },
         status: "open",
         usermail: userEmail || "unknown@example.com",
-        priority,
         description,
       };
 
@@ -259,7 +241,6 @@ export default function AddIssuePage() {
         setAddress("");
         setLatitude("");
         setLongitude("");
-        setPriority("");
         setTopIssues([]);
       }
     } finally {
@@ -401,41 +382,18 @@ export default function AddIssuePage() {
 
             {/* Priority + Submit */}
             <div className="flex gap-3">
-              <Button
-                type="button"
-                onClick={getPriority}
-                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold py-2 rounded-lg"
-                disabled={loadingPrediction || loadingPriority}
-              >
-                {loadingPriority ? "Detecting Priority..." : "Get Priority"}
-              </Button>
+             
               <Button
                 type="button"
                 onClick={handleSubmit}
                 className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!priority || submitting}
+                disabled={submitting}
               >
                 {submitting ? "Submitting..." : "Submit Issue"}
               </Button>
             </div>
 
             {/* Priority Result */}
-            {priority && (
-              <div className="mt-6 text-center">
-                <h2 className="text-lg font-semibold">Predicted Priority:</h2>
-                <span
-                  className={`text-xl font-bold ${
-                    priority === "critical"
-                      ? "text-red-600"
-                      : priority === "normal"
-                        ? "text-yellow-500"
-                        : "text-green-600"
-                  }`}
-                >
-                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                </span>
-              </div>
-            )}
           </form>
         </CardContent>
       </Card>
