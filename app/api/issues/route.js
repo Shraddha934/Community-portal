@@ -3,12 +3,14 @@ import connectToDB from "../../../lib/mongoose";
 import Issue from "../../../models/Issues";
 import User from "../../../models/User";
 import { getPriorityFromGemini } from "../../../lib/priorityAI";
+import { ISSUE_DEPARTMENT_MAP } from "../../../lib/departmentMap";
 
-// ✅ POST - create a new issue
+/* ================= POST ================= */
 export async function POST(req) {
   try {
     await connectToDB();
     const body = await req.json();
+
     const {
       issueType,
       image,
@@ -19,6 +21,14 @@ export async function POST(req) {
       criticality,
       title,
     } = body;
+
+    const department = ISSUE_DEPARTMENT_MAP[issueType];
+    if (!department) {
+      return NextResponse.json(
+        { success: false, error: "Invalid issue type" },
+        { status: 400 },
+      );
+    }
 
     const geoLocation = {
       type: "Point",
@@ -31,17 +41,17 @@ export async function POST(req) {
 
     const newIssue = await Issue.create({
       issueType,
+      department, // ✅ FIXED
       image,
       location: geoLocation,
       title: title || "Untitled Issue",
       status: status || "open",
-      usermail: usermail || "unknown@example.com",
+      usermail: usermail,
       priority: "pending",
       description: description || "",
       criticality: criticality || "Normal",
     });
 
-    // after creating issue
     const finalPriority = await getPriorityFromGemini({
       image,
       location,
@@ -52,22 +62,12 @@ export async function POST(req) {
     newIssue.priority = finalPriority;
     await newIssue.save();
 
-    // ✅ Award points (+3 for reporting an issue)
     if (usermail) {
-      const result = await User.updateOne(
+      await User.updateOne(
         { email: usermail },
         { $inc: { points: 3 } },
         { upsert: true },
       );
-
-      console.log("🎯 Gamification Update:", {
-        user: usermail,
-        updateResult: result,
-      });
-
-      // ✅ (Optional) fetch user to log new points value
-      const updatedUser = await User.findOne({ email: usermail });
-      console.log(`✅ ${usermail} now has ${updatedUser.points} points`);
     }
 
     return NextResponse.json(
@@ -75,7 +75,7 @@ export async function POST(req) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("❌ Error creating issue:", error);
+    console.error("❌ POST issue error:", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 },
@@ -83,7 +83,7 @@ export async function POST(req) {
   }
 }
 
-// ✅ GET - fetch issues, optionally nearby
+/* ================= GET ================= */
 export async function GET(req) {
   try {
     await connectToDB();
@@ -96,70 +96,73 @@ export async function GET(req) {
     if (searchParams.get("priority"))
       filters.priority = searchParams.get("priority");
 
-    const usermail = searchParams.get("usermail") || null; // current user
+    const usermail = searchParams.get("usermail");
+    if (!usermail) {
+      return NextResponse.json(
+        { success: false, error: "usermail required" },
+        { status: 400 }
+      );
+    }
+
+    const user = await User.findOne({ email: usermail });
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 }
+      );
+    }
 
     let issues;
 
-    // Check if geospatial query is requested
-    if (
-      searchParams.get("near") === "true" &&
-      searchParams.get("lat") &&
-      searchParams.get("lon")
-    ) {
-      const lat = parseFloat(searchParams.get("lat"));
-      const lon = parseFloat(searchParams.get("lon"));
-      const radiusKm = parseFloat(searchParams.get("radius")) || 0.5; // default 0.5 km
-      const radiusMeters = radiusKm * 1000;
+    // 👑 ADMIN → ALL
+    if (user.role === "admin") {
+      issues = await Issue.find(filters)
+        .sort({ createdAt: -1 })
+        .lean();
+    }
 
+    // 🏢 DEPARTMENT → ONLY DEPARTMENT ISSUES
+    else if (user.role === "department" && user.department) {
       issues = await Issue.find({
         ...filters,
-        "location.coordinates": {
-          $nearSphere: {
-            $geometry: {
-              type: "Point",
-              coordinates: [lon, lat],
-            },
-            $maxDistance: radiusMeters,
-          },
-        },
+        department: user.department,
       })
         .sort({ createdAt: -1 })
         .lean();
-    } else {
-      issues = await Issue.find(filters).sort({ createdAt: -1 }).lean();
     }
 
-    // Add "isLiked" info for current user
-    if (usermail) {
-      issues = issues.map((issue) => ({
-        ...issue,
-        isLiked: issue.likedBy?.includes(usermail),
-      }));
+    // 👤 NORMAL USER → OWN ISSUES
+    else {
+      issues = await Issue.find({
+        ...filters,
+        usermail,
+      })
+        .sort({ createdAt: -1 })
+        .lean();
     }
+
+    issues = issues.map((issue) => ({
+      ...issue,
+      isLiked: issue.likedBy?.includes(usermail),
+    }));
 
     return NextResponse.json({ success: true, issues });
   } catch (error) {
-    console.error("❌ Error fetching issues:", error);
+    console.error("❌ GET issue error:", error);
     return NextResponse.json(
       { success: false, error: error.message },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
 
-// ✅ PATCH - toggle like/unlike
+
+/* ================= PATCH ================= */
 export async function PATCH(req) {
   try {
     await connectToDB();
     const body = await req.json();
     const { issueId, usermail, commentText } = body;
-
-    if (!issueId) {
-      return NextResponse.json(
-        { success: false, error: "Missing issueId" },
-        { status: 400 },
-      );
-    }
 
     const issue = await Issue.findById(issueId);
     if (!issue) {
@@ -169,24 +172,17 @@ export async function PATCH(req) {
       );
     }
 
-    // 🔹 Handle like toggle
     if (usermail && !commentText) {
-      let likedBy = issue.likedBy || [];
-      if (likedBy.includes(usermail)) {
-        // Unlike
-        issue.likedBy = likedBy.filter((email) => email !== usermail);
-        issue.likesCount = Math.max(0, issue.likesCount - 1);
+      if (issue.likedBy.includes(usermail)) {
+        issue.likedBy = issue.likedBy.filter((e) => e !== usermail);
+        issue.likesCount--;
       } else {
-        // Like
-        likedBy.push(usermail);
-        issue.likedBy = likedBy;
-        issue.likesCount = (issue.likesCount || 0) + 1;
+        issue.likedBy.push(usermail);
+        issue.likesCount++;
       }
     }
 
-    // 🔹 Handle adding comment
     if (commentText && usermail) {
-      issue.comments = issue.comments || [];
       issue.comments.push({
         usermail,
         text: commentText,
@@ -198,12 +194,11 @@ export async function PATCH(req) {
 
     return NextResponse.json({
       success: true,
-      issueId,
       likesCount: issue.likesCount,
       comments: issue.comments,
     });
   } catch (error) {
-    console.error("❌ Error updating issue:", error);
+    console.error("❌ PATCH issue error:", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 },

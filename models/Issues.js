@@ -2,8 +2,27 @@ import mongoose from "mongoose";
 
 const IssueSchema = new mongoose.Schema(
   {
-    issueType: { type: String, required: true },
+    issueType: { type: String, 
+      enum:[
+        "broken_benches",
+        "open_manhole",
+        "streetlight",
+        "leaky_pipes",
+        "garbage",
+        "potholes",
+        "fallen_trees",
+      ],
+      required: true },
+
+    // 🔹 NEW FIELD (IMPORTANT)
+    department: {
+      type: String,
+      enum: ["DEPT_PWD", "DEPT_WATER", "DEPT_ENV"],
+      required: true,
+    },
+
     image: String,
+
     location: {
       type: {
         type: String,
@@ -19,31 +38,35 @@ const IssueSchema = new mongoose.Schema(
       landmark: String,
       fullAddress: String,
     },
+
     status: String,
     usermail: String,
     priority: String,
     description: String,
     criticality: String,
     title: String,
-    // 🔹 New fields for likes
+
+    // 🔹 Likes system (unchanged)
     likesCount: { type: Number, default: 0 },
     likedBy: { type: [String], default: [] },
-    // storing Clerk user IDs or emails
 
+    // 🔹 Comments (unchanged)
     comments: [
       {
-        usermail: { type: String, required: true }, // Clerk email of commenter
+        usermail: { type: String, required: true },
         text: { type: String, required: true },
         createdAt: { type: Date, default: Date.now },
       },
     ],
+
     inProgressOn: { type: Date },
     closedOn: { type: Date },
   },
   { timestamps: true }
 );
 
-// 🔹 Add 2dsphere index for geospatial queries
+// 🔹 Geospatial index (keep this exactly)
 IssueSchema.index({ "location.coordinates": "2dsphere" });
 
-export default mongoose.models.Issue || mongoose.model("Issue", IssueSchema);
+export default mongoose.models.Issue ||
+  mongoose.model("Issue", IssueSchema);

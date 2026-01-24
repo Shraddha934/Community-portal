@@ -44,7 +44,7 @@ export default function DashboardPage() {
         },
         (err) => {
           console.error("Error fetching location:", err);
-        }
+        },
       );
     }
   }, []);
@@ -57,6 +57,7 @@ export default function DashboardPage() {
     const fetchIssues = async () => {
       try {
         const params = new URLSearchParams();
+        if (!user || !user.primaryEmailAddress?.emailAddress) return;
         if (filters.status) params.append("status", filters.status);
         if (filters.issueType) params.append("issueType", filters.issueType);
         if (filters.priority) params.append("priority", filters.priority);
@@ -121,8 +122,8 @@ export default function DashboardPage() {
                   ? issue.likesCount - 1
                   : issue.likesCount + 1,
               }
-            : issue
-        )
+            : issue,
+        ),
       );
 
       const res = await fetch("/api/issues", {
@@ -314,8 +315,8 @@ export default function DashboardPage() {
                     issue.priority === "high"
                       ? "bg-red-600"
                       : issue.priority === "medium"
-                      ? "bg-yellow-500"
-                      : "bg-green-600"
+                        ? "bg-yellow-500"
+                        : "bg-green-600"
                   }`}
                 >
                   {issue.priority
@@ -375,7 +376,7 @@ export default function DashboardPage() {
                   onClick={(e) => {
                     e.stopPropagation();
                     router.push(
-                      `/dashboard/view-issue?id=${issue._id}#comments`
+                      `/dashboard/view-issue?id=${issue._id}#comments`,
                     );
                   }}
                 >
