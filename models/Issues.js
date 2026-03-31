@@ -2,8 +2,9 @@ import mongoose from "mongoose";
 
 const IssueSchema = new mongoose.Schema(
   {
-    issueType: { type: String, 
-      enum:[
+    issueType: {
+      type: String,
+      enum: [
         "broken_benches",
         "open_manhole",
         "streetlight",
@@ -12,12 +13,13 @@ const IssueSchema = new mongoose.Schema(
         "potholes",
         "fallen_trees",
       ],
-      required: true },
+      required: true,
+    },
 
     // 🔹 NEW FIELD (IMPORTANT)
     department: {
       type: String,
-      enum: ["DEPT_PWD", "DEPT_WATER", "DEPT_ENV"],
+      enum: ["DEPT_INF", "DEPT_WATER", "DEPT_SAN"],
       required: true,
     },
 
@@ -62,11 +64,10 @@ const IssueSchema = new mongoose.Schema(
     inProgressOn: { type: Date },
     closedOn: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // 🔹 Geospatial index (keep this exactly)
 IssueSchema.index({ "location.coordinates": "2dsphere" });
 
-export default mongoose.models.Issue ||
-  mongoose.model("Issue", IssueSchema);
+export default mongoose.models.Issue || mongoose.model("Issue", IssueSchema);

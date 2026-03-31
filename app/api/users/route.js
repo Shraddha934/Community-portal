@@ -15,7 +15,7 @@ const DEPARTMENT_EMAIL_MAP = {
   // "envdept@gmail.com": "DEPT_ENV",
 
   "cirppublicinfrastructure@gmail.com": "DEPT_INF",
-  "cirpwaterandsewage@gmail.com": "DEPT_WAT",
+  "cirpwaterandsewage@gmail.com": "DEPT_WATER",
   "cirpsanitation@gmail.com": "DEPT_SAN",
 };
 

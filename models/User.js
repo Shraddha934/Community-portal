@@ -14,13 +14,13 @@ const UserSchema = new mongoose.Schema(
 
     department: {
       type: String,
-      enum: ["DEPT_PWD", "DEPT_WATER", "DEPT_ENV"],
+      enum: ["DEPT_INF", "DEPT_WATER", "DEPT_SAN"],
       default: null,
     },
 
     points: { type: Number, default: 0 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const User = mongoose.models.User || mongoose.model("User", UserSchema);
