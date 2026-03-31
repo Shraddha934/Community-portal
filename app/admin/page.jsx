@@ -25,7 +25,7 @@ export default function AdminDashboard() {
     async function fetchIssues() {
       try {
         const res = await axios.get("/api/issues");
-        if (res.data.success) {
+        if (res.data.success || res.data) {
           setIssues(res.data.issues);
         }
       } catch (err) {
@@ -45,7 +45,7 @@ export default function AdminDashboard() {
   const total = issues.length;
   const openCount = issues.filter((i) => i.status === "open").length;
   const inProgressCount = issues.filter(
-    (i) => i.status === "inprogress"
+    (i) => i.status === "inprogress",
   ).length;
   const resolvedCount = issues.filter((i) => i.status === "resolved").length;
 
@@ -71,8 +71,8 @@ export default function AdminDashboard() {
 
       setIssues((prevIssues) =>
         prevIssues.map((i) =>
-          i._id === issue._id ? { ...i, status: res.data.status } : i
-        )
+          i._id === issue._id ? { ...i, status: res.data.status } : i,
+        ),
       );
 
       setPendingStatuses((prev) => {
@@ -238,8 +238,8 @@ export default function AdminDashboard() {
                       issue.priority === "high"
                         ? "text-red-600 font-semibold"
                         : issue.priority === "medium"
-                        ? "text-yellow-600 font-semibold"
-                        : "text-green-600 font-semibold"
+                          ? "text-yellow-600 font-semibold"
+                          : "text-green-600 font-semibold"
                     }
                   >
                     {issue.priority}

@@ -10,9 +10,13 @@ const ADMIN_EMAIL = [
 
 // 👇 NEW: department head email mapping
 const DEPARTMENT_EMAIL_MAP = {
-  "shraddhapauras@gmail.com": "DEPT_WATER",
-  "eranest226@gmail.com": "DEPT_PWD", 
-  "envdept@gmail.com": "DEPT_ENV",
+  // "shraddhapauras@gmail.com": "DEPT_WATER",
+  // "eranest226@gmail.com": "DEPT_PWD",
+  // "envdept@gmail.com": "DEPT_ENV",
+
+  "cirppublicinfrastructure@gmail.com": "DEPT_INF",
+  "cirpwaterandsewage@gmail.com": "DEPT_WAT",
+  "cirpsanitation@gmail.com": "DEPT_SAN",
 };
 
 export async function POST(req) {
@@ -43,7 +47,7 @@ export async function POST(req) {
     const user = await User.findOneAndUpdate(
       { _id: userId },
       { name, email, role, department },
-      { new: true, upsert: true }
+      { new: true, upsert: true },
     );
 
     return NextResponse.json({ success: true, user });
